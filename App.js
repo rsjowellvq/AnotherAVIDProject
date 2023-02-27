@@ -1,4 +1,12 @@
 /**
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
  * Sample React Native App
  * https://github.com/facebook/react-native
  *
@@ -11,8 +19,10 @@
  * 
  */
 import 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, StackActions } from '@react-navigation/native';
 import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigation/drawer';
+import {Calendar, CalendarList, Agenda} from 'react-native-calendars';
+import { createStackNavigator } from '@react-navigation/stack';
 import BleManager, { read } from 'react-native-ble-manager';
 import React from 'react';
 import auth from '@react-native-firebase/auth';
@@ -35,6 +45,8 @@ import {
   Image,
   useColorScheme,
   View,
+  requireNativeComponent,
+  TouchableHighlight,
 } from 'react-native';
 import { config, send } from 'process';
 import { add } from 'react-native-reanimated';
@@ -42,6 +54,7 @@ import { add } from 'react-native-reanimated';
 
 
 const Drawer = createDrawerNavigator();
+const Stack = createStackNavigator();
 //const bleManagerModule = NativeModules.BleManager;
 const userAccountPtr = firestore().collection("User Accounts");
 //var token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6ImFkbWluIiwiaGFzaCI6ImUxMGFkYzM5NDliYTU5YWJiZTU2ZTA1N2YyMGY4ODNlIiwiUGVybWlzc2lvbiI6MSwiaWF0IjoxNTQyOTY0MzAzLCJleHAiOjE1NDU4NDQzMDN9.5pEJJAOY8cVLZiBgo8Qszq8EZPHDFyyvqsriBxGXLTo'
@@ -53,7 +66,7 @@ const languages = ['English','Spanish','French','German'];
 const lastMemoryAddress = [3,128];
 var currentConnectedDeviceID;
 const months = ["Jan.","Feb.","Mar.","Apr.","May.","Jun.","Jul.","Aug.","Sept.","Oct.","Nov.","Dec."];
-
+const avidPurpleHex = '#722053';
 
 
 var configArray;
@@ -164,37 +177,69 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
 
     //bleManagerEmitter.addListener('BleManagerDidWrite', handleDidWrite );
 
+   
+      
+        /*
+        <Drawer.Navigator screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: '#722080'}}}>
+          <Drawer.Screen name="USAGE DATA HISTORY" component={UsageHistoryScreen}/>
+          
+          <Drawer.Screen name="CONNECTION" component={ConnectionScreen}/>
+          <Drawer.Screen name="SIGNUP" component={SignupScreen}/>
+          <Drawer.Screen name="REGISTER DEVICE" component={Register_Device}/>
+          <Drawer.Screen name="ABOUT" component={About}/>
+          <Drawer.Screen name="LOGOUT" component={About}/>
+          
+          <Drawer.Screen name="SELECT_DEVICE" component={SelectDeviceScreen}/>
+        </Drawer.Navigator>
+        
+        */
 
+    
+        
+   const LoginSignupScreen = () => (
 
+    <Drawer.Navigator initialRouteName='CONNECTION' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: '#722080'}}}>
+    <Drawer.Screen name="USAGE DATA HISTORY" component={UsageHistoryScreen}/>
+    
+    <Drawer.Screen name="CONNECTION" component={ConnectionScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+    <Drawer.Screen name="SIGNUP" component={SignupScreen}/>
+    <Drawer.Screen name="REGISTER DEVICE" component={Register_Device}/>
+    <Drawer.Screen name="ABOUT" component={About}/>
+    <Drawer.Screen name="LOGOUT" component={Logout}/>
+    
+    <Drawer.Screen name="SELECT_DEVICE" component={SelectDeviceScreen}/>
+  </Drawer.Navigator>
+
+   );
   
 
   return(
 
 
-    <NavigationContainer>
-      
-    <Drawer.Navigator initialRouteName="Login"  screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: '#722080'}}}>
-      <Drawer.Screen name="USAGE DATA HISTORY" component={UsageHistoryScreen}/>
-      <Drawer.Screen name="Login" component={LoginScreen} options={{headerShown:false}}  />
-      <Drawer.Screen name="CONNECTION" component={ConnectionScreen}/>
-      <Drawer.Screen name="SIGNUP" component={SignupScreen}/>
-      <Drawer.Screen name="REGISTER DEVICE" component={Register_Device}/>
-      <Drawer.Screen name="ABOUT" component={About}/>
-      <Drawer.Screen name="LOGOUT" component={About}/>
-      
-      <Drawer.Screen name="SELECT_DEVICE" component={SelectDeviceScreen}/>
-    </Drawer.Navigator>
+    
+      <NavigationContainer>
+    <Stack.Navigator initialRouteName="Login">
+      <Stack.Screen name="Login" component={LoginScreen} options={{headerShown:false}}/>
+      <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+      <Stack.Screen name="Main" component={LoginSignupScreen} options={{headerShown:false}}/>
+    </Stack.Navigator>
+    </NavigationContainer>
     
     
-  </NavigationContainer>
+    
+    
+   
+    
+    
+  
   )
 
 }
 
 
-function loginSignupScreen()
+function Logout({navigation})
 {
-  
+  navigation.navigate("Login");
 }
 
 const SelectDeviceScreen = ({navigation}) => {
@@ -402,16 +447,98 @@ const SignupScreen = ({navigation}) => {
   const [emaillabelColor,setEmailLabelColor] = React.useState('grey');
   const [nameLabelColor,setNameLabelColor] = React.useState('grey');
   const [passwordLabelColor,setPasswordLabelColor] = React.useState('grey');
+  const [usernameStatus,setUsernameStatus]=React.useState("");
+  const [emailStatus,setemailstatus] = React.useState("");
 
   
-  
+  function checkInput(type,value)
+  {
+    
+    
+    const statusMsg = type == "user"?"Username already taken":"E-mail already in use";
+    
+    
+    setTimeout(()=>{
+
+      var requestOptions;
+      if(type=="user")
+      {
+        requestOptions = {
+      
+          method:'POST',
+          headers: new Headers({
+            'Content-Type': 'application/x-www-form-urlencoded', // <-- Specifying the Content-Type
+          }),
+          body: 'action=checkUsername&username='+value+'&appversion='+appVersion
+          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+    
+    
+        };
+      }
+      else
+      {
+        requestOptions = {
+      
+          method:'POST',
+          headers: new Headers({
+            'Content-Type': 'application/x-www-form-urlencoded', // <-- Specifying the Content-Type
+          }),
+          body: 'action=checkEmail&email='+value+'&appversion='+appVersion
+          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+    
+    
+        };
+      }
+
+      fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((res)=>res.json()).then((resjson)=>{
+
+      resjson.code == "202"?setUsernameStatus(statusMsg):setUsernameStatus("");  
+      
+      
+      
+      
+      console.log("Status Is "+resjson.code);
+
+
+      }).catch((error)=>{
+        console.log(error);
+
+      });
+
+
+      /*
+
+      fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+      setUploadStatus(uploadStatus+"\nUpload Complete!");
+      console.log("Response Is "+responseJson.code+" "+responseJson.msg);
+
+      }).catch((error,data)=>{console.log("The Error "+error+" "+data)});
+
+      */
+      
+      
+      //const userRequestOptions = 
+
+
+    },100);
+
+    
+    console.log("Username Is "+value);
+  }
+
+
+// <TextInput InputProps={{disableUnderline: false}} style={styles.textFields} onChangeText={(text)=>setUsername(text)} value={username} name='usernameField'></TextInput>
   
   return(
-    <View style={{width: '80%',justifyContent:'center',alignSelf:'center'  ,marginTop: '10%'}}>
+    <View style={{backgroundColor:'white',alignItems:'center'}}>
+    <ScrollView style={{marginTop:'5%',width:'85%'}}>
     <Text style={[styles.signUpLabels,{color:userLabelColor}]}>Username*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setUsername(text);validateForm();}} value={username}></TextInput>
+    <TextInput style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
+    <Text style={{color:'red',fontSize:'10',marginBottom:'7%'}}>{usernameStatus}</Text>
     <Text style={[styles.signUpLabels,{color:emaillabelColor}]}>E-Mail*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setEmail(text);validateForm();}} value={eMail}></TextInput>
+    <TextInput style={styles.textFields} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
+    <Text>{emailStatus}</Text>
     <Text style={styles.signUpLabels}>Doctor E-mail</Text>
     <TextInput style={styles.textFields}></TextInput>
     <Text style={styles.signUpLabels}>Additional E-Mail 1</Text>
@@ -430,6 +557,7 @@ const SignupScreen = ({navigation}) => {
     <TextInput style={styles.textFields} onChangeText={(text)=>{setConfirmPassword(text);validateForm();}} value={confirmPassword}></TextInput>
     <TouchableOpacity onPress={()=>{validateForm();if(formIsValid){navigation.navigate("SELECT_DEVICE");}}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Signup</Text></TouchableOpacity>
   
+    </ScrollView>
     </View>
   );
   
@@ -461,6 +589,9 @@ const SignupScreen = ({navigation}) => {
   
   }
 
+
+
+
   const ConnectionScreen = ({navigation}) => {
 
     
@@ -473,9 +604,11 @@ const SignupScreen = ({navigation}) => {
     
     return(
       <View style={{flex:1}}>
-        <Text style={styles.loginLabels}>Paired</Text>
+        <View style={{width:'90%',paddingTop:'10%',alignSelf:'center'}}>
+        <Text style={styles.grayButton}>Paired</Text>
         <TextInput></TextInput>
-        <Text style={styles.loginLabels}>Available</Text>
+        <Text style={styles.grayButton}>Available</Text>
+        </View>
         <View style={{justifyContent: 'flex-end',flex:1,marginBottom: 30}}>
         <View style={{justifyContent: 'space-evenly',  flexDirection: "row",marginTop: 10, width:'100%'}}>
         <TouchableOpacity style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053' }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 15, margin:10 }}>New</Text></TouchableOpacity>
@@ -525,6 +658,15 @@ const SignupScreen = ({navigation}) => {
     const [showUsageRecord,setShowUsageRecord] = React.useState(false);
     const [showQuestionRecord,setShowQuestionRecord] = React.useState(false);
     const [uploadStatus,setUploadStatus] = React.useState("");
+    const [markedDates,setMarkedDates] = React.useState({});
+
+
+    var markedDateObj={};
+
+    const usageOver20 = {key:'over20',color:'green'};
+    const usageUnder20 = {key:'under20',color:'purple'};
+    const allQuestionsAnswered = {key:'allAnswered',color:'red'};
+    const skippedQuestions = {key:'skippedQuestions',color:'pink'};
     
     /*
 
@@ -864,17 +1006,20 @@ const SignupScreen = ({navigation}) => {
 
     return(
       <View>
+
+      <Calendar markingType={'multi-dot'}></Calendar>
+{/*}
         <View>
           <Text>Welcome, {currentUserData.name}</Text>
           <Text>Device Number: {currentUserData.serialnumber}</Text>
         </View>
         <View style={{flexDirection:'column',marginTop:'10%',justifyContent:'space-evenly'}}  >
-        {/*  <Button style={{marginTop:'10%'}} title="Previous" onPress={()=>{if(currentRecordIndex != 0){setCurrentRecordIndex(currentRecordIndex-1);console.log(currentRecordIndex);}  }}/>*/}
+          <Button style={{marginTop:'10%'}} title="Previous" onPress={()=>{if(currentRecordIndex != 0){setCurrentRecordIndex(currentRecordIndex-1);console.log(currentRecordIndex);}  }}/>
           <Pressable  title="Click Here to Read and Upload Your AVID Data" onPress={()=>{BleManager.scan([],5,false).then(()=>{setUploadStatus(uploadStatus+"Scanning");console.log("Scan Started");});}}>
             <Text style={{textAlign:'center',fontSize:30}}>Click Here To Read and Upload Your AVID Data</Text>
           </Pressable>
           <Text>{uploadStatus}</Text>
-          {/*<Button style={{marginTop:'10%'}} title="Next" onPress={()=>{console.log(currentRecordIndex); if(currentRecordIndex != usageRecords.length-1)
+          <Button style={{marginTop:'10%'}} title="Next" onPress={()=>{console.log(currentRecordIndex); if(currentRecordIndex != usageRecords.length-1)
             { 
               setCurrentRecordIndex(currentRecordIndex+1);
               if(usageRecords[currentRecordIndex].length == 10)
@@ -890,10 +1035,10 @@ const SignupScreen = ({navigation}) => {
             
             }
             
-            }}/> */}
+            }}/> 
         </View>
         
-          {/*showDisplay && (<View>
+          showDisplay && (<View>
 
         
         <Text style={{display:showUsageRecord?'flex':'none'}}>Date: {months[usageRecords[currentRecordIndex].month-1]+" "+usageRecords[currentRecordIndex].day+" "+"20"+usageRecords[currentRecordIndex].year}</Text>
@@ -918,9 +1063,9 @@ const SignupScreen = ({navigation}) => {
         
 
     
-          </View>)*/}
+          </View>)
 
-
+*/}
 
 
       </View>
@@ -935,17 +1080,25 @@ const SignupScreen = ({navigation}) => {
 
   const LoginScreen = ({navigation}) => {
 
-    const [avidSerialNumber,getSerialNumber] = React.useState("No Devices Found!");
     
+    const eyeCloseIcon = "./images/eyesclose.jpg";
+    const eyeOpenIcon = "./images/eyesopen.jpg";
+    
+    const [avidSerialNumber,getSerialNumber] = React.useState("No Devices Found!");
     const [username,setUsername]= React.useState("");
     const [password,setPassword]= React.useState("");
     const [loginStatus,setLoginStatus] = React.useState("");
+    const [eyeIcon,setEyeIcon] = React.useState(require(eyeCloseIcon));
+    const [secureTextOn,setSecureTextOn] = React.useState(true);
     
     
     
     function processLogin(usernameInput,passwordInput)
     {
     
+      //navigation.navigate("Main");
+      //return;
+
       
       if(username == "")
       {
@@ -1000,7 +1153,7 @@ const SignupScreen = ({navigation}) => {
                     auth().signInWithEmailAndPassword(document.data().eMail,passwordInput).then(()=>{
                       setLoginStatus("Login Successful via Firebase");
                       console.log("Login Successful! Woohoo!");
-                      navigation.navigate("USAGE DATA HISTORY");
+                      navigation.navigate("Main");
 
                     }).catch(error=>{
 
@@ -1024,7 +1177,7 @@ const SignupScreen = ({navigation}) => {
                   
                     setLoginStatus("User Created In Firebase");
                     console.log("Cheese Boobs");
-                    navigation.navigate("USAGE DATA HISTORY");
+                    navigation.navigate("Main");
     
                   });
                   
@@ -1044,7 +1197,7 @@ const SignupScreen = ({navigation}) => {
             }
             if(responseJson.code == "203")
             {
-              Alert.alert("Login Error","Username of Password Incorrect");
+              Alert.alert("Login Error","Username or Password Incorrect");
               setLoginStatus("Username or Password Error Please Try Again (old system)");
               return;
             }
@@ -1079,8 +1232,8 @@ const SignupScreen = ({navigation}) => {
       <TextInput InputProps={{disableUnderline: false}} style={styles.textFields} onChangeText={(text)=>setUsername(text)} value={username} name='usernameField'></TextInput>
       <Text style={styles.loginLabels}>Password</Text>
       <View style={{width:'100%',flexDirection:'row'}}>
-      <TextInput style={[styles.textFields,{flex:10}]} onChangeText={(text)=>setPassword(text)} value={password} name='passwordField'></TextInput>
-      <Image style={{flex:0}} source={require("./images/eyesclose.jpg")}/>
+      <TextInput secureTextEntry={secureTextOn} style={[styles.textFields,{flex:10}]} onChangeText={(text)=>setPassword(text)} value={password} name='passwordField'></TextInput>
+      <TouchableHighlight onPress={()=>{console.log("boobs");setSecureTextOn(!secureTextOn);if(secureTextOn){setEyeIcon(require(eyeOpenIcon));}else{setEyeIcon(require(eyeCloseIcon));}}}><Image style={{flex:0}} source={eyeIcon}/></TouchableHighlight>
       </View>
       <View style={{flexDirection: "row",marginTop: 10, width:'100%',justifyContent:'space-between'}}>
       <TouchableOpacity><Text style={styles.grayButton}>Forgot Username?</Text></TouchableOpacity>
@@ -1091,7 +1244,7 @@ const SignupScreen = ({navigation}) => {
 
       
       <TouchableOpacity onPress={()=>{processLogin(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
-      <TouchableOpacity onPress={()=>{navigation.navigate("SIGNUP") }}><Text style={[styles.purpleButton,{marginTop:'6%'}]}>Sign Up</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{navigation.navigate("Sign Up") }}><Text style={[styles.purpleButton,{marginTop:'6%'}]}>Sign Up</Text></TouchableOpacity>
 
       {/*
       <TouchableOpacity onPress={()=>{processLogin(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
@@ -1146,6 +1299,10 @@ const styles = StyleSheet.create({
     
 
   },
+  headerBarStyle:
+  {
+    
+  },
   
   
   sectionContainer: {
@@ -1161,6 +1318,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '400',
   },
+
   highlight: {
     fontWeight: '700',
   },

@@ -24,7 +24,7 @@ import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigatio
 import {Calendar, CalendarList, Agenda} from 'react-native-calendars';
 import { createStackNavigator } from '@react-navigation/stack';
 import BleManager, { read } from 'react-native-ble-manager';
-import React from 'react';
+import React, { useCallback } from 'react';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 //import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
@@ -50,6 +50,7 @@ import {
 } from 'react-native';
 import { config, send } from 'process';
 import { add } from 'react-native-reanimated';
+import { BleATTErrorCode } from 'react-native-ble-plx';
 
 
 
@@ -133,16 +134,26 @@ class QuestionObject
 const App = () =>
 {
     
-    React.useEffect(()=>{
+    
+   
+  React.useEffect(()=>{
 
       BleManager.start();
+
+
       
       //bleManagerEmitter.addListener('BleManagerStopScan', handleStopScan);
 
 
 
     });
-  
+
+    
+    
+
+
+    
+    
 
     /*
 
@@ -199,15 +210,15 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
    const LoginSignupScreen = () => (
 
     <Drawer.Navigator initialRouteName='CONNECTION' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: '#722080'}}}>
-    <Drawer.Screen name="USAGE DATA HISTORY" component={UsageHistoryScreen}/>
+    <Drawer.Screen name="Usage Data Calendar" initialParams={{month:new Date().getMonth()+1,day:new Date().getDate(),year:new Date().getFullYear()}} component={UsageHistoryScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
     
     <Drawer.Screen name="CONNECTION" component={ConnectionScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
-    <Drawer.Screen name="SIGNUP" component={SignupScreen}/>
+    
     <Drawer.Screen name="REGISTER DEVICE" component={Register_Device}/>
     <Drawer.Screen name="ABOUT" component={About}/>
     <Drawer.Screen name="LOGOUT" component={Logout}/>
     
-    <Drawer.Screen name="SELECT_DEVICE" component={SelectDeviceScreen}/>
+    {/*<Drawer.Screen name="SELECT_DEVICE" component={SelectDeviceScreen}/>*/}
   </Drawer.Navigator>
 
    );
@@ -239,6 +250,7 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
 
 function Logout({navigation})
 {
+  currentUserData = null;
   navigation.navigate("Login");
 }
 
@@ -278,7 +290,7 @@ const handleFoundDevice = (peripheral) => {
 
   
   
-
+  console.log("We Found One "+peripheral.id);
   
   
 
@@ -308,7 +320,7 @@ const handleFoundDevice = (peripheral) => {
 
 setTimeout(()=>{
 
-  BleManager.scan([],5,false).then(()=>{
+  BleManager.scan([],700,false).then(()=>{
     console.log("NEw Scan Started");
   
    })
@@ -492,7 +504,10 @@ const SignupScreen = ({navigation}) => {
 
       fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((res)=>res.json()).then((resjson)=>{
 
-      resjson.code == "202"?setUsernameStatus(statusMsg):setUsernameStatus("");  
+      if(type=="user")
+        resjson.code == "202"?setUsernameStatus(statusMsg):setUsernameStatus("");  
+      else
+        resjson.code == "202"?setemailstatus(statusMsg):setemailstatus("");  
       
       
       
@@ -535,10 +550,10 @@ const SignupScreen = ({navigation}) => {
     <ScrollView style={{marginTop:'5%',width:'85%'}}>
     <Text style={[styles.signUpLabels,{color:userLabelColor}]}>Username*</Text>
     <TextInput style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
-    <Text style={{color:'red',fontSize:'10',marginBottom:'7%'}}>{usernameStatus}</Text>
+    <Text style={{color:'red',fontSize:10,marginBottom:'7%'}}>{usernameStatus}</Text>
     <Text style={[styles.signUpLabels,{color:emaillabelColor}]}>E-Mail*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
-    <Text>{emailStatus}</Text>
+    <TextInput style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
+    <Text style={{color:'red',fontSize:10,marginBottom:'7%'}}>{emailStatus}</Text>
     <Text style={styles.signUpLabels}>Doctor E-mail</Text>
     <TextInput style={styles.textFields}></TextInput>
     <Text style={styles.signUpLabels}>Additional E-Mail 1</Text>
@@ -590,6 +605,19 @@ const SignupScreen = ({navigation}) => {
   }
 
 
+  const DeviceDisplayObject = (deviceName,deviceID,lastUploadDate) =>
+  {
+    return(
+      <View style={{flexDirection:"row"}}>
+        <Image source={require("./images/phone.jpg")}/>
+        <View>
+          <Text>Name: {deviceName}</Text>
+          <Text>Id: {deviceID}</Text>
+          <Text>Last Updated: {lastUploadDate}</Text>
+        </View>
+      </View>
+    );
+  };
 
 
   const ConnectionScreen = ({navigation}) => {
@@ -626,7 +654,7 @@ const SignupScreen = ({navigation}) => {
   
   };
 
-
+ 
   const makeButton = (size,style,title,onPressFunction)=>{
 
     
@@ -648,17 +676,33 @@ const SignupScreen = ({navigation}) => {
   
   
 
-
   
-  const UsageHistoryScreen = ({navigation}) =>{
+  
+
+ 
+
+  const UsageHistoryScreen = ({route,navigation}) =>{
 
     
+    console.log(route.params.year+"-"+route.params.month+"-"+route.params.day);
+
+
     const [currentRecordIndex,setCurrentRecordIndex] = React.useState(0);
     const [showDisplay,setShowDisplay] = React.useState(false);
     const [showUsageRecord,setShowUsageRecord] = React.useState(false);
     const [showQuestionRecord,setShowQuestionRecord] = React.useState(false);
     const [uploadStatus,setUploadStatus] = React.useState("");
-    const [markedDates,setMarkedDates] = React.useState({});
+    const initialMarkedDates = {}
+    const [datesUpdated,setDatesUpdated] = React.useState(false);
+    const [markedDates,updateMarkedDates] = React.useState({});
+    const [currentMonth,setCurrentMonth] = React.useState([route.params.month,route.params.year]);
+    //const [currentYear,setCurrentYear] = React.useState(route.params.year);
+    console.log(currentMonth);
+    const Circle = (color,size) => {
+      return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>
+
+
+    };
 
 
     var markedDateObj={};
@@ -667,6 +711,76 @@ const SignupScreen = ({navigation}) => {
     const usageUnder20 = {key:'under20',color:'purple'};
     const allQuestionsAnswered = {key:'allAnswered',color:'red'};
     const skippedQuestions = {key:'skippedQuestions',color:'pink'};
+
+    //https://avid.vqconnect.io/nodejs/userList?startTime=2022-12-01&endTime=2023-02-26&action=findUserUsageDataByMonth&uid=63cac64fe428e916acab5c6d&token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc3NTE5OTgyLCJleHAiOjE2ODAzOTk5ODJ9.9TNOad5q4MP1pSW_6SQXxdJj268W6H0oWXxMWThlLio
+
+
+    const getMonthUsageData = (month,year) =>
+  {
+    
+    var dataObject = {};
+    
+    
+    const monthDays= ["31","28","31","30","31","30","31","31","30","31","30","31"];
+    if(year%4 == 0)
+      monthDays[1]="29";
+  
+    month < 10 ? month = "0"+month:month=month;
+  
+    console.log("URL IS "+"https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByMonth&startTime="+year+"-"+month+"-01&endTime="+year+"-"+month+"-"+monthDays[month-1]+"&uid="+currentUserData.uid+"&token="+currentUserData.token);
+    
+    if(datesUpdated == false)
+      fetch("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByMonth&startTime="+year+"-"+month+"-01&endTime="+year+"-"+month+"-"+monthDays[month-1]+"&uid="+currentUserData.uid+"&token="+currentUserData.token,{method:'GET'}).then((responseData)=>responseData.json()).then((responseJson)=>{
+  
+    for(var i=0;i<responseJson.data.length;i++)
+    {
+      if(responseJson.data[i].MinOfUseTotal > 0)
+      {
+        //dataObject={};
+        
+        var currentDot = responseJson.data[i].MinOfUseTotal >= 20 ? usageOver20:usageUnder20;
+        
+        dataObject[responseJson.data[i]._id]={dots:[currentDot]};
+        
+        
+        
+        
+      }
+        //console.log(dataObject);
+    }  
+    
+    //setMarkedDates(dataObject);
+    //console.log(dataObject);
+    updateMarkedDates(dataObject);
+    setDatesUpdated(true);
+    //return;
+    
+  
+    });//.then((data)=>{setMarkedDates(markedDates=>({...markedDates,...dataObject}));console.log(markedDates);});
+  
+    //setMarkedDates(markedDates=>({...markedDates,...dataObject}));
+    //console.log(markedDates);
+    
+  
+  };
+
+
+
+
+
+
+if(datesUpdated == false)
+  getMonthUsageData(currentMonth[0],currentMonth[1]);
+else
+{
+  console.log("Final Data Is");
+  console.log(markedDates);
+}
+
+//setMarkedDates(dataObject);
+//console.log("Done");
+//console.log(markedDates);
+//setMarkedDates(markedDateObj);
     
     /*
 
@@ -962,7 +1076,7 @@ const SignupScreen = ({navigation}) => {
       
       
       
-      console.log("Peripheral Discovered");
+      console.log("Peripheral Discovered "+peripheral);
     
 
   
@@ -1006,8 +1120,13 @@ const SignupScreen = ({navigation}) => {
 
     return(
       <View>
-
-      <Calendar markingType={'multi-dot'}></Calendar>
+        <View style={{marginTop:'5%',marginHorizontal:'5%',marginBottom:'5%'}}>
+      <View style={{flexDirection:'row'}}>{Circle("green",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Usage total time &gt;= 20</Text></View>
+      <View style={{flexDirection:'row'}}>{Circle("purple",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Usage total time &lt; 20</Text></View>
+      <View style={{flexDirection:'row'}}>{Circle("red",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;All questions are answered</Text></View>
+      <View style={{flexDirection:'row'}}>{Circle("pink",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Some Questions Skipped</Text></View>
+      </View>
+      <Calendar markedDates={markedDates} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
 {/*}
         <View>
           <Text>Welcome, {currentUserData.name}</Text>
@@ -1090,8 +1209,9 @@ const SignupScreen = ({navigation}) => {
     const [loginStatus,setLoginStatus] = React.useState("");
     const [eyeIcon,setEyeIcon] = React.useState(require(eyeCloseIcon));
     const [secureTextOn,setSecureTextOn] = React.useState(true);
-    
-    
+
+
+   
     
     function processLogin(usernameInput,passwordInput)
     {

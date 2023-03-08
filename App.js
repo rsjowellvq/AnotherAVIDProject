@@ -22,15 +22,17 @@ import 'react-native-gesture-handler';
 import { NavigationContainer, StackActions } from '@react-navigation/native';
 import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigation/drawer';
 import {Calendar, CalendarList, Agenda} from 'react-native-calendars';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, HeaderBackButton } from '@react-navigation/stack';
 import BleManager, { read } from 'react-native-ble-manager';
 import React, { useCallback } from 'react';
+import { Table, TableWrapper, Row, Rows, Col, Cols, Cell } from 'react-native-table-component';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 //import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import Buffer from 'buffer';
 import {
   Alert,
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -205,15 +207,19 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
         
         */
 
-    
+       
         
-   const LoginSignupScreen = () => (
+   const MainStack = ({route,navigation}) => (
 
-    <Drawer.Navigator initialRouteName='CONNECTION' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: '#722080'}}}>
-    <Drawer.Screen name="Usage Data Calendar" initialParams={{month:new Date().getMonth()+1,day:new Date().getDate(),year:new Date().getFullYear()}} component={UsageHistoryScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+    
+    <Drawer.Navigator initialRouteName='CONNECTION' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: avidPurpleHex}}}>
     
     <Drawer.Screen name="CONNECTION" component={ConnectionScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
     
+    <Drawer.Screen name="USAGE HISTORY" initialParams={{month:new Date().getMonth()+1,day:new Date().getDate(),year:new Date().getFullYear()}} component={UsageHistoryScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+    <Drawer.Screen name="USAGE SUBSTACK" component={UsageHistoryStack} options={{drawerItemStyle:{display:"none"},unmountOnBlur:true,headerShown:false}}/>
+    
+   
     <Drawer.Screen name="REGISTER DEVICE" component={Register_Device}/>
     <Drawer.Screen name="ABOUT" component={About}/>
     <Drawer.Screen name="LOGOUT" component={Logout}/>
@@ -222,6 +228,29 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
   </Drawer.Navigator>
 
    );
+
+
+   const UsageHistoryStack = ({route,navigation}) => {
+
+    
+    
+    function convertDateString(input)
+    {
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return months[parseInt(input.substring(6,7))-1]+" "+input.substring(8,10)+", "+input.substring(0,4);
+    }
+    
+    
+    
+    return(<Stack.Navigator initialRouteName='Day Use Screen' >
+    
+    
+    <Stack.Screen name="Day Use Screen" options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',title: convertDateString(route.params.currentDate), headerShown:true, headerLeft: ()=>(<TouchableOpacity onPress={()=>{navigation.navigate("USAGE HISTORY");}}><Text style={{fontWeight:'bold',fontSize:17,color:'white'}}>&nbsp;&lt; Back</Text></TouchableOpacity>    ),}}  initialParams={{currentDate:route.params.currentDate,from:route.params.from}} component={DayUsageScreen}/>
+    <Stack.Screen name="Usage Data Detail" component={UsageDetailScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',drawerItemStyle:{display:'none'}}}/>
+    
+    </Stack.Navigator>);
+  
+   };
   
 
   return(
@@ -232,7 +261,7 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
     <Stack.Navigator initialRouteName="Login">
       <Stack.Screen name="Login" component={LoginScreen} options={{headerShown:false}}/>
       <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
-      <Stack.Screen name="Main" component={LoginSignupScreen} options={{headerShown:false}}/>
+      <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
     </Stack.Navigator>
     </NavigationContainer>
     
@@ -246,6 +275,9 @@ dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0
   )
 
 }
+
+
+
 
 
 function Logout({navigation})
@@ -674,9 +706,187 @@ const SignupScreen = ({navigation}) => {
 
   }
   
-  
+  const UsageDetailScreen = ({route,navigation}) => {
 
+    const currentData = route.params.dataObject;
+    console.log("Info Is "+route.params.isUsage);
+
+
+    return(
+      <View style={{width:'100%'}}>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Date</Text><Text style={styles.usageDetailData}>{currentData.DateOfTreatment}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Time</Text><Text style={styles.usageDetailData}>{currentData.TimeOfTreatment}</Text></View>
+      {route.params.isUsage == true &&
+      <View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Preset</Text><Text style={styles.usageDetailData}>{currentData.PresetNumber}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Device Pause Time</Text><Text style={styles.usageDetailData}>{currentData.MinOfPause}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Channel 1 max Amp used</Text><Text style={styles.usageDetailData}>{currentData.Channel1MaxAmpUsed}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Channel 1 average Amp used</Text><Text style={styles.usageDetailData}>{currentData.Channel1AverageAmpUsed}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Channel 2 max Amp used</Text><Text style={styles.usageDetailData}>{currentData.Channel2MaxAmpUsed}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Channel 2 average Amp used</Text><Text style={styles.usageDetailData}>{currentData.Channel2AverageAmpUsed}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Minutes of Use</Text><Text style={styles.usageDetailData}>{currentData.MinOfUse}</Text></View>
+</View>}
+{route.params.isUsage == false &&
+  <View>
+    <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Q1 Pain Before</Text><Text style={styles.usageDetailData}>{currentData.PainBefore}</Text></View>
+    <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Q2 Decr Meds</Text><Text style={styles.usageDetailData}>{currentData.DecrMeds}</Text></View>
+    <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Q3 Help Work</Text><Text style={styles.usageDetailData}>{currentData.HelpWork}</Text></View>
+    <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Q4 Help Home</Text><Text style={styles.usageDetailData}>{currentData.HelpHome}</Text></View>
+    <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Q5 Pain After</Text><Text style={styles.usageDetailData}>{currentData.PainAfter}</Text></View>
+  </View>
+
+
+}
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Address</Text><Text style={styles.usageDetailData}>{currentData.Address}</Text></View>
+      <View style={styles.usageDataDetailCell}><Text style={styles.usageDetailLabels}>Upload Time</Text><Text style={styles.usageDetailData}>{currentData.uploadTime}</Text></View>
+      
+      </View>
+
+    );
+
+
+  }
+ 
   
+  const DayUsageScreen = ({route,navigation}) => {
+
+    console.log("Chicken Nuggets");
+    const [tableData,setTableData] = React.useState([[]]);
+    const [dataLoaded,setDataLoaded] =React.useState(false);
+    const [date,setDate] = React.useState("");
+    const [questionHeight,setQuestionHeight] = React.useState(40);
+    const [usageHeight,setUsageHeight] = React.useState(40);
+
+    const [usageBtnTxtClr,setUsageBtnTxtClr] = React.useState('#555555');
+    const [usageBtnBkgrndClr,setUsageBtnBkgrndClr] = React.useState('white');
+    const [questionBtnBkgrndClr,setQuestionBtnBkgrndClr] = React.useState('white');
+    const [questionBtnTxtClr,setQuestionBtnTxtClr] = React.useState('#555555');
+    const [allBtnBkgrndClr,setAllBtnBkgrndClr] = React.useState(avidPurpleHex);
+    const [allBtnTxtClr,setAllBtnTxtClr] = React.useState('white');
+    console.log("From is "+route.params.currentDate+" "+route.params.from);
+    
+    var usageData=null;
+    var tableInfo=[];
+    console.log("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByDay&dayTime="+route.params.currentDate+"&token="+currentUserData.token);
+    
+    
+    
+    
+    
+    fetch("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByDay&dayTime="+route.params.currentDate+"&uid="+currentUserData.uid+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
+      
+    usageData = responseJson.data;
+    console.log(usageData);
+    for(var x = 0;x < responseJson.data.length;x++)
+      {
+        console.log(responseJson.data[x]);
+        var currentObj = [];
+        //var currentColor = responseJson.data[x].Type == "U"?"blue":"green";
+        //currentElement.style={color:currentColor};
+        //currentObj.push(currentColor);
+        //const currentData = [responseJson.data[x].DateOfTreatment,responseJson.data[x].TimeOfTreatment];
+        currentObj.push(responseJson.data[x].DateOfTreatment.substring(0,8));
+        currentObj.push(responseJson.data[x].TimeOfTreatment);
+        if(responseJson.data[x].Type == "U")
+        {
+          currentObj.push(responseJson.data[x].PresetNumber);
+          currentObj.push(responseJson.data[x].MinOfUse);
+        }
+        else
+        {
+          currentObj.push("");
+          currentObj.push("");
+        }
+        currentObj.push(">");
+        //var currentElement = <Row data={["A","B"]} style={{backgroundColor:currentColor}}></Row>
+        tableInfo.push(currentObj);
+      }
+      
+      if(dataLoaded == false)
+      {
+        setDataLoaded(true);
+        setTableData(tableInfo);
+      }
+        
+        
+      
+     
+      
+
+    });
+    
+    /*
+
+     return request({
+        url:global.url +"nodejs/userList?" +"action=findUserUsageDataByDay" +
+        "&uid=" +uid +"&dayTime=" +dayTime +"&token=" +global.token+'&appversion='+global.appVersion,
+        method:'get',
+    })
+
+    */
+
+   
+    function setButtons(sender)
+    {
+      if(sender == "Usage")
+      {
+        setAllBtnBkgrndClr("white");
+        setAllBtnTxtClr("#555555");
+        setQuestionBtnBkgrndClr("white");
+        setQuestionBtnTxtClr("#555555");
+        setUsageBtnBkgrndClr(avidPurpleHex);
+        setUsageBtnTxtClr("white");
+      }
+      if(sender == "Question")
+      {
+        setAllBtnBkgrndClr("white");
+        setAllBtnTxtClr("#555555");
+        setQuestionBtnBkgrndClr(avidPurpleHex);
+        setQuestionBtnTxtClr("white");
+        setUsageBtnBkgrndClr("white");
+        setUsageBtnTxtClr("#555555");
+        
+      }
+      if(sender == "All")
+      {
+        setAllBtnBkgrndClr(avidPurpleHex);
+        setAllBtnTxtClr("white");
+        setQuestionBtnBkgrndClr("white");
+        setQuestionBtnTxtClr("#555555");
+        setUsageBtnBkgrndClr("white");
+        setUsageBtnTxtClr("#555555");
+      }
+    }
+    
+    
+    //const currentDate = route.params.date;
+    return<View>
+      <View style={{alignSelf:'center',  flexDirection:'row',padding:'5%'}}>
+      <TouchableOpacity onPress={()=>{setButtons("Usage");setQuestionHeight(0);setUsageHeight(40);}} style={{flex:1,borderWidth:1,borderColor:avidPurpleHex,backgroundColor:usageBtnBkgrndClr}}><Text style={{padding:'4%',alignSelf:'center', fontSize:16,fontWeight:'bold',color:usageBtnTxtClr}}>Usage</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{setButtons("Question");setQuestionHeight(40);setUsageHeight(0);}} style={{flex:1,borderWidth:1,borderColor:avidPurpleHex,backgroundColor:questionBtnBkgrndClr}}><Text style={{padding:'4%',alignSelf:'center',fontSize:16,fontWeight:'bold',color:questionBtnTxtClr}}>Question</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{setButtons("All");setQuestionHeight(40);setUsageHeight(40);}} style={{flex:1,borderWidth:1,borderColor:avidPurpleHex,backgroundColor:allBtnBkgrndClr}}><Text style={{padding:'4%',alignSelf:'center',fontSize:16,fontWeight:'bold',color:allBtnTxtClr}}>All</Text></TouchableOpacity>
+     
+      </View>
+      <Table>
+        <Row textStyle={{fontSize:16,fontWeight:'bold',color:'#555555',textAlign:'center'}} data={["Date","Time","Preset#","Minutes of Use",""]}></Row>
+        <ScrollView>
+      {
+        tableData.map((rowData,index) => (
+
+          <TouchableOpacity buttonKey={index} onPress={()=>{var boolVal;if(index%2==0){boolVal=false;}else{boolVal=true;}navigation.navigate("Usage Data Detail",{dataObject:usageData[index],isUsage:boolVal});}}>
+          <Row textStyle={{fontSize:16,fontWeight:'bold',color:'#555555',textAlign:'center'}} key={index} data={rowData} style={[styles.dayUsageRow,{height:questionHeight},index%2 && {height:usageHeight,backgroundColor:'#d9fae9'}]} />
+          </TouchableOpacity>
+
+        ))
+      }</ScrollView>
+
+
+        
+      </Table>
+     
+    </View>;
+
+  }
   
 
  
@@ -741,11 +951,21 @@ const SignupScreen = ({navigation}) => {
         var currentDot = responseJson.data[i].MinOfUseTotal >= 20 ? usageOver20:usageUnder20;
         
         dataObject[responseJson.data[i]._id]={dots:[currentDot]};
+
+        if(Object.values(responseJson.data[i]._id).includes("UA"))
+        {
+          dataObject[responseJson.data[i]._id].dots.push(skippedQuestions);
+        }
+        else
+        {
+          dataObject[responseJson.data[i]._id].dots.push(allQuestionsAnswered);
+        }
         
         
         
         
       }
+      
         //console.log(dataObject);
     }  
     
@@ -1126,7 +1346,7 @@ else
       <View style={{flexDirection:'row'}}>{Circle("red",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;All questions are answered</Text></View>
       <View style={{flexDirection:'row'}}>{Circle("pink",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Some Questions Skipped</Text></View>
       </View>
-      <Calendar markedDates={markedDates} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
+      <Calendar markedDates={markedDates}  onDayPress={day=>{console.log("The Day Is "+day.dateString);if(day.dateString in markedDates){navigation.navigate("USAGE SUBSTACK",{currentDate:day.dateString,from:"calendar"});}  }} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
 {/*}
         <View>
           <Text>Welcome, {currentUserData.name}</Text>
@@ -1209,6 +1429,7 @@ else
     const [loginStatus,setLoginStatus] = React.useState("");
     const [eyeIcon,setEyeIcon] = React.useState(require(eyeCloseIcon));
     const [secureTextOn,setSecureTextOn] = React.useState(true);
+    const [isLoading,setIsLoading] = React.useState(false);
 
 
    
@@ -1218,11 +1439,12 @@ else
     
       //navigation.navigate("Main");
       //return;
+      setIsLoading(true);
 
       
       if(username == "")
       {
-        
+        setIsLoading(false);
         if(password == "")
           Alert.alert("Input Error","Username & Password are blank");
         else
@@ -1233,6 +1455,7 @@ else
       }
       else if(password == "")
       {
+        setIsLoading(false);
         Alert.alert("Input Error","Password is blank");
       }
       
@@ -1281,6 +1504,7 @@ else
                       
                       if(error.code == "auth/wrong-password")
                       {
+                        setIsLoading(false);
                         Alert.alert("Login Error","Password Incorrect");
                         setLoginStatus("Login Failed - Wrong Password (Firebase)");
                         return;
@@ -1294,7 +1518,7 @@ else
                   auth().createUserWithEmailAndPassword(responseJson.data.email,passwordInput).then(()=>{
 
                     userAccountPtr.doc(usernameInput).set({eMail:responseJson.data.email});
-                  
+                    setIsLoading(false);
                     setLoginStatus("User Created In Firebase");
                     console.log("Cheese Boobs");
                     navigation.navigate("Main");
@@ -1347,7 +1571,7 @@ else
       
         <Image style={styles.loginScreenImage} source={require("./images/AVID.jpg")} />
       
-      <View style={{width: '80%'}}>
+      <View style={{width: '85%'}}>
       <Text style={styles.loginLabels}>Username</Text>
       <TextInput InputProps={{disableUnderline: false}} style={styles.textFields} onChangeText={(text)=>setUsername(text)} value={username} name='usernameField'></TextInput>
       <Text style={styles.loginLabels}>Password</Text>
@@ -1365,7 +1589,8 @@ else
       
       <TouchableOpacity onPress={()=>{processLogin(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
       <TouchableOpacity onPress={()=>{navigation.navigate("Sign Up") }}><Text style={[styles.purpleButton,{marginTop:'6%'}]}>Sign Up</Text></TouchableOpacity>
-
+      <Text>&nbsp;&nbsp;&nbsp;</Text>
+      <ActivityIndicator animating={isLoading}/>
       {/*
       <TouchableOpacity onPress={()=>{processLogin(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
       
@@ -1453,7 +1678,7 @@ const styles = StyleSheet.create({
   grayButton:
   {
     fontFamily:'Proxima Nova',
-    fontSize:17,
+    fontSize:15,
     fontWeight:'bold',
     color:'gray'
   },
@@ -1463,6 +1688,13 @@ const styles = StyleSheet.create({
     fontSize:17,
     fontWeight:'bold',
     color:'#722053'
+  },
+  dayUsageRow:
+  {
+    backgroundColor:'#e0ecff',
+    fontSize:20
+   
+
   },
 
   
@@ -1483,6 +1715,29 @@ const styles = StyleSheet.create({
       fontFamily: 'Proxima Nova',
       fontWeight:'400',
       color: 'black'
+    },
+    usageDetailLabels:
+    {
+      fontSize:16,
+      color: '#555555',
+      fontWeight:'bold',
+      flex:2,
+      alignSelf:'flex-start'
+    },
+    usageDetailData:
+    {
+      fontSize:16,
+      color: '#969696',
+      flex:1,
+      fontWeight:'bold',
+      alignSelf:'flex-end',
+      textAlign:'right'
+    },
+    usageDataDetailCell:
+    {
+      padding:'3%',
+      flexDirection:'row',
+      alignContent:'stretch'
     },
     signUpLabels:
     {

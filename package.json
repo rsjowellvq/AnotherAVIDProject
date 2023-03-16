@@ -17,6 +17,7 @@
     "@react-navigation/drawer": "^6.5.6",
     "@react-navigation/native": "^6.1.1",
     "@react-navigation/stack": "^6.3.14",
+    "moment": "^2.29.4",
     "react": "18.1.0",
     "react-native": "0.70.6",
     "react-native-ble-manager": "^8.5.0",

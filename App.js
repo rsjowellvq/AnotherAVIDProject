@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Text,
   Pressable,
+  Modal,
   TextInput,
   Button,
   TouchableOpacity,
@@ -31,6 +32,7 @@ import {
   requireNativeComponent,
   TouchableHighlight,
 } from 'react-native';
+import { acc } from 'react-native-reanimated';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -66,6 +68,27 @@ const styles = StyleSheet.create({
     headerBarStyle:
     {
       
+    },
+    centeredView: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 22,
+    },
+    modalView: {
+      margin: 20,
+      backgroundColor: 'white',
+      borderRadius: 20,
+      padding: 35,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
     },
     
     
@@ -227,7 +250,7 @@ const App = () => {
           <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
           <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
           <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
-         
+          <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
         </Stack.Navigator>
         </NavigationContainer>
       )
@@ -411,7 +434,7 @@ const LoginScreen = ({route,navigation}) => {
     const [loginProcessStaus,setLoginProcessStatus] = React.useState("");
   console.log("aches");
   var nextLoginScreen = "";
-    function processLogin(usernameInput,passwordInput)
+    function checkFieldInputs(usernameInput,passwordInput)
     {
       
         
@@ -435,8 +458,36 @@ const LoginScreen = ({route,navigation}) => {
           setIsLoading(false);
           Alert.alert("Input Error","Password is blank");
         }
+        else
+          processLogin(usernameInput,passwordInput).then((response)=>{
 
+            if(response == "success")
+            {
+              setLoginProcessStatus(""); 
+                      
+              var theNextLoginScreen = (route.params != null && route.params.from == "logout") ? "HOME":"Main";
+              setLoginProcessStatus("Loading Usage Data"); 
+              getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
+                //console.log(result);
+                setIsLoading(false);
+                navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+              });
+            }
+            else
+            {
+              setLoginProcessStatus(""); 
+              if(response == "wrong_password")
+              {
+                setIsLoading(false);
+                Alert.alert("Login Error","Password Incorrect");
+              }
+            }
+
+          });
+        //Begin Process Login
+        /*
         const requestOptions = {
       
             method:'POST',
@@ -560,7 +611,7 @@ const LoginScreen = ({route,navigation}) => {
             }
 
 
-          });
+          });*/
           console.log("bats");
 
           
@@ -593,13 +644,153 @@ const LoginScreen = ({route,navigation}) => {
       </View>
 
       
-      <TouchableOpacity onPress={()=>{processLogin(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{checkFieldInputs(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
       <TouchableOpacity onPress={()=>{navigation.navigate("Sign Up") }}><Text style={[styles.purpleButton,{marginTop:'6%'}]}>Sign Up</Text></TouchableOpacity>
       <Text>&nbsp;&nbsp;&nbsp;</Text>
       <ActivityIndicator animating={isLoading}/>
       <Text style={{color:'grey',fontSize:10}}>{loginProcessStaus}</Text>
       </View>);
 } //End Login Screen
+
+
+
+
+function processLogin(username,password)
+{
+  return new Promise(function(resolve,reject){
+  
+  const requestOptions = {
+      
+    method:'POST',
+    headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+    body: 'action=signIn&whereJson='+JSON.stringify({"username":username,"password":password})+'&appversion='+appVersion
+    //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+
+
+  };
+
+  fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+      switch(responseJson.code)
+      {
+          case 200:
+            console.log("hello world");
+            currentUserData = responseJson.data;
+            //Get Device Info
+            fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{userDeviceInfo = responseJson.data;});
+            console.log(currentUserData.serialnumber);
+            userAccountPtr.doc(username).get().then((document)=>
+            {
+              if(document.exists)
+              {
+                      auth().signInWithEmailAndPassword(document.data().eMail,password).then(()=>{
+                      resolve("success");  
+                      /*setLoginProcessStatus(""); 
+                      
+                      var theNextLoginScreen = (route.params != null && route.params.from == "logout") ? "HOME":"Main";
+                      setLoginProcessStatus("Loading Usage Data"); 
+                      getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                        //console.log(result);
+                        setIsLoading(false);
+                        navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+                      });*/
+                      /*
+                      if(route.params != null && route.params.from == "logout")
+                      {
+                        console.log("happy meal -a ");
+                                  nextLoginScreen = "HOME";
+                                  //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
+                                  setLoginProcessStatus("Loading Usage Data"); 
+                                  getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                                    console.log(result);
+                                    setIsLoading(false);
+                                    navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+  
+                                  });
+                                  //navigation.navigate("HOME",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
+                                  //navigation.navigate("HOME");
+                                }
+                                else
+                                {
+                                  
+                                  nextLoginScreen = "Main";
+                                  //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
+                                  setLoginProcessStatus("Loading Usage Data"); 
+                                  getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                                    console.log("happy mealllla "+currentUserData.serialnumber);
+                                    console.log(result);
+                                    setIsLoading(false);
+                                    navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+  
+                                  });
+                                  //navigation.navigate("Main",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
+                                  //navigation.navigate("Main");
+                                }*/
+                                    
+
+
+                            }).catch(error=>{
+
+                              resolve("wrong_password");
+                              /*setLoginProcessStatus(""); 
+                                if(error.code == "auth/wrong-password")
+                                {
+                                  setIsLoading(false);
+                                  Alert.alert("Login Error","Password Incorrect");
+                                  return;
+                                }*/
+          
+                              });
+                        }
+                        else
+                        {
+                            auth().createUserWithEmailAndPassword(responseJson.data.email,password).then(()=>{
+
+                                setLoginProcessStatus("Logging In"); 
+                                userAccountPtr.doc(username).set({eMail:responseJson.data.email});
+                                setIsLoading(false);
+                                //nextLoginScreen = "HOME";
+                                //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
+                                setLoginProcessStatus("Loading Usage Data"); 
+                                getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                                  //console.log(result);
+                                  navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+                                });
+                                
+                                //navigation.navigate("HOME",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
+                
+                              });
+                        }
+
+                    });
+                    break;
+
+
+                case 202:
+
+                case 203:
+                    Alert.alert("Login Error","Username or Password Incorrect");
+                    setIsLoading(false);
+                    setLoginProcessStatus("");
+                    setLoginStatus("Username or Password Error Please Try Again (old system)");
+                    return;
+
+
+
+              }
+
+    }); //End Fetch
+})}// <----
+
+
+
+
 
 function getMonthUsageData(month,year){
 
@@ -679,9 +870,129 @@ function getMonthUsageData(month,year){
 });};
 
 
+const DeviceSelection = ({route,navigation}) => {
+
+  
+  console.log(JSON.stringify(route.params.newUserInfo));
+  var [deviceList,setDeviceList] = React.useState([]);
+  var [foundDevices,setFoundDevices] = React.useState([]); 
+  var [isScanning,setIsScanning] = React.useState(false);
+  var [isRegistering,setIsRegistering] = React.useState(false);
+
+  function createNewUser(deviceID)
+  {
+   
+    route.params.newUserInfo.serial_number = deviceID;
+    
+    
+    const dataRequestOptions = {
+  
+      method:'POST',
+      headers: {'x-access-token':currentUserData.token},
+      body: 'action=appsignuo&dataJson='+JSON.stringify(route.params.newUserInfo)+'&appversion='+appVersion
+      //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+  
+  
+    };
+
+
+    fetch("https://avid.vqconnect.io/nodejs/login",dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+
+    if(responseJson.code == 200)
+    {
+      auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then(()=>{
+
+        userAccountPtr.doc(username).set({eMail:responseJson.data.email});
+        getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+          //console.log(result);
+          setIsLoading(false);
+          navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+        });
+
+
+
+      });
+    }
+
+
+
+    });
+    
+    
+    /*
+      export function req_SignUp(userDic){
+        return request({
+        url:global.url+'nodejs/login',
+        method:'post',
+        data:'action=appsignUp'+'&whereJson='+JSON.stringify(userDic)+'&appversion='+global.appVersion,
+    })
+}
+
+    */
+  }
+  const handleSelectFoundDevice = (peripheral) => {
+    navigation.setOptions({headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isScanning}/>)});
+  onChanged = (e,name) =>{
+
+    Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
+
+      {text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}
+
+    ]);
+
+  }
+    if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid" && !foundDevices.includes(peripheral.advertising.localName.substring(5)))
+    {
+      setDeviceList(deviceList => [...deviceList,<Pressable style={{marginTop:'3%',marginBottom:'3%',alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:avidPurpleHex,borderColor:avidPurpleHex}} deviceId={peripheral.advertising.localName.substring(5)} onPress={e=>onChanged(e,peripheral.advertising.localName.substring(5))} ><Text style={{padding:'4%',fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 15}}>{peripheral.advertising.localName.substring(5)}</Text></Pressable>])
+      setFoundDevices(foundDevices =>[...foundDevices,peripheral.advertising.localName.substring(5)]);
+    }
+
+  }
+
+  bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
+  bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleSelectFoundDevice);
+  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
+
+    setIsScanning(false);
+    
+    //console.log("Scan Stopped "+args.status);
+
+  });
+
+
+
+  return(
+<View>
+  <Modal animationType='none' visible={isRegistering} transparent={true}  >
+    <View style={styles.centeredView}>
+      <View style={styles.modalView}>
+    <Text style={{textAlign:'center'}}>Submitting Your Information</Text>
+    </View>
+    </View>
+    <ActivityIndicator animating={true}/>
+  </Modal>
+  <TouchableOpacity onPress={()=>{BleManager.scan([],20,false);}} style={{alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:"#D8D8D8",borderColor:avidPurpleHex}}><Text style={{padding:'4%',alignSelf:'center', fontSize:20,fontWeight:'bold',color:avidPurpleHex}}>Scan For Nearby Devices</Text></TouchableOpacity>
+<View>
+  {deviceList}
+  </View>
+</View>
+  );
+
+
+
+}
+
+
+
+
+
 const MainScreen = ({route,navigation}) => {
 
   console.log(currentUserData);
+  console.log("Last Upload Was "+userDeviceInfo.lastdatatime);
   const [uploadStatus,setUploadStatus] = React.useState("");
   const initialMarkedDates = {}
   const [datesUpdated,setDatesUpdated] = React.useState(false);
@@ -697,14 +1008,278 @@ const MainScreen = ({route,navigation}) => {
   navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
+  function calculation(add_0,add_1)
+{
+  return parseInt( (changeNumBase(add_1)+ changeNumBase(add_0)) ,16);
+} 
+
+function changeNumBase(number)
+{
+  let hexStr = number.toString(16);
+  if(hexStr.length ==1){
+      hexStr = '0'+hexStr;
+  }
+  return hexStr;
+}
+
+function generateDateTimeString(year,month,day,hour,minute)
+{
+  var dateString = months[month-1]+" "+day+" 20"+year;
+  var timeString= "";
+  if(hour == 0 || hour == 12)
+  {
+    timeString+="12";
+  }
+  else if(hour > 12)
+  {
+    if(hour % 12 < 10)
+      timeString += "0"+(hour%12).toString();
+    else
+      timeString += (hour%12).toString();
+  }
+  else
+  {
+    timeString += hour.toString();
+  }
+  if(minute < 10)
+    minute = "0"+minute;
+  timeString += ":"+minute+" ";
+  if(hour < 12)
+    timeString += "AM";
+  else
+    timeString += "PM";
+
+  return [dateString,timeString];
+//return months[month]+" "+day+" 20"+year+" "+(hour%13).toString()
+}
   
- 
+
+function convertDateStringForCompare(year,month,day,hour,minute)
+{
+  var returnString = "";
+  returnString += "20"+year+"-";
+  if(month < 10)
+    returnString += "0"+month+"-";
+  else
+    returnString += month+"-";
+  
+  if(day < 10)
+    returnString += "0"+day+" ";
+  else
+    returnString += day+" ";
+
+  if(hour<10)
+    returnString += "0"+hour+":";
+  else
+    returnString += hour+":";
+
+  if(minute<10)
+    returnString += "0"+minute;
+  else
+    returnString += minute;
+
+  return returnString;
+
+}
+  
+  function newGetDeviceData(peripheral,address)
+  {
+
+    console.log("Address is "+address+" ");
+  BleManager.connect(peripheral.id).then(()=>{
+    setUploadStatus(uploadStatus+'\n'+"Connected to AVID Device. Retrieving Services");
+      BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+        setUploadStatus(uploadStatus+'\n'+"\nReading Data. Please Wait.");
+          BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{console.log("Wrote Address "+address)});
+
+          setTimeout(()=>{
+
+              BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+
+                  //Get Config Data
+                  
+                  if(address[0] == 0 && address[1]==0)
+                  {
+                      let complianceTime = parseInt(changeNumBase(readData[3])+changeNumBase(readData[2])+changeNumBase(readData[1])+changeNumBase(readData[0]),16);
+                      var complianceHours;
+                      if(complianceTime/60 < 1)
+                        complianceHours = 0;
+                      else
+                        complianceHours = 1;
+                      let comTime = `${complianceHours} hrs ${complianceTime%60} min`;
+                      configArray = [comTime,languages[readData[12]],readData[14],Boolean(readData[15]),Boolean(readData[16])];
+                      lastUsageAddress = (256*readData[5]+readData[4])-16;
+                      console.log("Config Array "+configArray);
+                      console.log("Last Usage Data "+lastUsageAddress+" "+[readData[5],readData[4]]);
+                      //Start Reading Preset Data
+                      if(readData[4] == 0)
+                        newGetDeviceData(peripheral,[readData[5]-1,0]);
+                      else
+                        newGetDeviceData(peripheral,[readData[5],readData[4]-16]);
+                      //newGetDeviceData(peripheral,[readData[5],readData[4]]);
+                  }
+                  
+                  //Get Preset Data
+                  else if(256*address[0]+address[1] < 896)
+                  {
+                      console.log("Preset Is "+readData)
+                      console.log("Next Preset Address "+[address[0],address[1]+32]);
+                      if(address[1] == 240)
+                        newGetDeviceData(peripheral,[address[0]+1,0]);
+                      else
+                        newGetDeviceData(peripheral,[address[0],address[1]+32]);
+                  }
+                  else
+                  {
+                          if(userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                          {
+                            if(readData[0]==93)
+                            {
+                                console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                                usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                            }
+                            if(readData[0]==173)
+                            {
+                              console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
+                              usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
+                            }
+                          }
+                         
+                          
+                          
+                          //console.log(256*address[1]+address[0]+" "+lastUsageAddress);
+                          /*if(256*address[0]+address[1] < lastUsageAddress - 16)
+                          {
+                              if(address[1] == 240)
+                              {
+                                  newGetDeviceData(peripheral,[address[0]+1,0]);
+                              }
+                              else
+                              {
+                                  newGetDeviceData(peripheral,[address[0],address[1]+16]);
+                              }
+                          }*/
+                          if(256*address[0]+address[1]>896)
+                          {
+                            if(address[1] == 0)
+                              {
+                                  newGetDeviceData(peripheral,[address[0]-1,240]);
+                              }
+                              else
+                              {
+                                  newGetDeviceData(peripheral,[address[0],address[1]-16]);
+                              }
+                          }
+                          else
+                          {
+                              uploadDeviceData(usageArray);
+                          }
+                          
+                      
+                      
+                  }
+
+
+              });
+
+          },500);
+
+      });
+
+  });//End Connect
+}
+
+
+
+function uploadDeviceData(usageData)
+{
+  
+  setScanStatus("Uploading Data To Server!");
+  console.log("Here we do");
+  var jsonData = "{";
+jsonData += '"SerialNumber":"'+currentUserData.serialnumber+'","UserInfo":{"PatientName":"'+currentUserData.name+'","PatientEmail":"'+currentUserData.email+'","DoctorEmail":"'+currentUserData.doctorEmail+'","DeviceName":"Avid IF2"},';
+jsonData += '"Usage":[';
+for(var i = 0; i < usageData.length;i++)
+{
+  if(usageData[i][0] == "U")
+  {
+    console.log("Date Is "+usageData[i][1][0]);
+    jsonData += '["'+usageData[i][0]+'",["'+usageData[i][1][0]+'","'+usageData[i][1][1]+'"],'+usageData[i][2]+','+usageData[i][4]+','+usageData[i][3]+','+usageData[i][5]+','+usageData[i][6]+','+usageData[i][7]+','+usageData[i][8]+','+usageData[i][9]+']';
+  }
+    
+  else
+  {
+    jsonData += '["'+usageData[i][0]+'",["'+usageData[i][1][0]+'","'+usageData[i][1][1]+'"],';
+    
+    for(var j = 2;j<8;j++)
+    {
+      if(isNaN(usageData[i][j]))
+        jsonData += '"'+usageData[i][j]+'"';
+      else
+        jsonData += usageData[i][j];
+      if(j != 7)
+        jsonData+= ",";
+      else
+        jsonData+= "]";
+
+    }
+    
+    //+usageData[i][2]+','+usageData[i][3]+','+usageData[i][4]+','+usageData[i][5]+','+usageData[i][6]+','+usageData[i][7]+']';
+  }
+    
+  if(i != usageData.length - 1)
+    jsonData += ",";
+
+}
+jsonData += '],';
+jsonData+= '"Config":["'+configArray[0]+'","'+configArray[1]+'","'+configArray[2]+'","'+configArray[3]+'","'+configArray[4]+'"]';
+jsonData += ',"Preset":[[0,0,0,0,0,0,0,0,0]]';
+jsonData += "}";
+console.log(jsonData);
+
+
+  /*
+  token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc0NTAxNzk4LCJleHAiOjE2NzczODE3OTh9.69wZGgeSBXvaPmxXu7URgXhYu_-ZfZjUis1oxu32EYg
+    action=insertData
+    dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0,0,0,0,0,0,0],["A",["Oct. 12 2022","06:20 PM"],0,0,0,0,0,0]],"Preset":[[0,0,0,0,0,0,0,0,0]],"Config":[2,2,2,2,2],"UserInfo":{"PatientName":"Russell Jowell","PatientEmail":"russ.jowell@gmail.com","DoctorEmail":"russdoctor@medical.com","DeviceName":"Avid IF2"}}
+
+  */
+  
+  
+    console.log("Token Is "+currentUserData.token);
+  
+  
+  const dataRequestOptions = {
+  
+    method:'POST',
+    headers: {'x-access-token':currentUserData.token},
+    body: 'action=insertData&dataJson='+jsonData+'&appversion='+appVersion
+    //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+
+
+  };
+  
+  console.log(dataRequestOptions.body);
+  
+  fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+  setScanStatus("Upload Complete");
+
+  setIsUpdating(false);
+  setUploadStatus(uploadStatus+"\nUpload Complete!");
+  console.log("Response Is "+responseJson.code+" "+responseJson.msg);
+
+  }).catch((error,data)=>{console.log("The Error "+error+" "+data)});
+  
+} 
+
   const handleDiscoverDevice = (peripheral) => {
 
     if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid")
     {
       BleManager.stopScan().then(()=>{
 
+        setScanStatus("Reading Data from Device");
         newGetDeviceData(peripheral,[0,0]);
 
 
@@ -713,7 +1288,7 @@ const MainScreen = ({route,navigation}) => {
 
   }
 
-
+  bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleDiscoverDevice);
   bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
 
@@ -740,6 +1315,7 @@ const MainScreen = ({route,navigation}) => {
 
   const startDeviceScanButton = () => {
 
+    setIsUpdating(true);
     setIsScanning(true);
     setScanButtonColor("#bbb");
     setScanButtonOpacity(0.3);
@@ -764,8 +1340,8 @@ return(
 <Calendar markedDates={markedDates}  onDayPress={day=>{console.log("The Day Is "+day.dateString);if(day.dateString in markedDates){navigation.navigate("USAGE SUBSTACK",{currentDate:day.dateString,from:"calendar"});}  }} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);updateCalendar([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:28,marginTop:'8%'}]}>Your Current Device:</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23}]}>{currentUserData.serialnumber}</Text>
-<TouchableOpacity   disabled={isScanning} alignSelf='center' onPress={()=>{startDeviceScanButton();}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:20, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
-<Text>{scanStatus}</Text>
+<TouchableOpacity   disabled={isScanning} alignSelf='center' onPress={()=>{startDeviceScanButton();}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
+<Text style={{fontSize:17,color:'grey',alignSelf:'center'}}>{scanStatus}</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23,marginTop:'8%'}]}>Last Upload Time:</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:18}]}>{moment(userDeviceInfo.lastdatatime,'YYYY-MM-DD').format('MMM DD, YYYY')}</Text>
 </View>
@@ -781,7 +1357,13 @@ const SignupScreen = ({navigation}) => {
   const [username,setUsername] = React.useState("");
   const [eMail,setEmail] = React.useState("");
   const [nameEntry,setNameEntry] = React.useState("");
+  const [patientName,setPatientName] = React.useState("");
   const [password,setPassword] = React.useState("");
+  const [doctorEmail,setDoctorEmail] = React.useState("");
+  const [email1,setemail1] = React.useState("");
+  const [email2,setemail2] = React.useState("");
+  const [email3,setemail3] = React.useState("");
+  const [accountNumber,setAccountNumber] = React.useState("");
   const [confirmPassword,setConfirmPassword] = React.useState("");
   const [userLabelColor,setUserLabelColor] = React.useState('grey');
   const [emaillabelColor,setEmailLabelColor] = React.useState('grey');
@@ -792,6 +1374,51 @@ const SignupScreen = ({navigation}) => {
   const [emailStatus,setemailstatus] = React.useState("");
   const [confirmPasswordStatus,setConfirmPasswordStatus] = React.useState("");
   
+  function buildUserObject()
+  {
+    var object = {};
+    object.name = nameEntry;
+    object.email = eMail;
+    object.username = username;
+    object.password = password;
+    object.doctorEmail = doctorEmail;
+    object.additionalEmail2 = email2;
+    object.additionalEmail3 = email3;
+    object.additionalEmail = email1;
+    object.accountNumber = accountNumber;
+    return object;
+  }
+
+
+  /*
+   var result = await new AdminModel({
+                "PatientName"       : whereJson.name,
+                "email"             : whereJson.email.toLowerCase(),  // 之前Register的Patientemail
+                "doctorEmail"       : whereJson.doctorEmail.toLowerCase(),
+                "additionalEmail2"  : whereJson.additionalEmail2.toLowerCase(),
+                "additionalEmail3"  : whereJson.additionalEmail3.toLowerCase(),
+                //
+                "additional_email": whereJson.additionalEmail.toLowerCase(),
+                "user_name": whereJson.username,
+                "password": newPassword,
+                "accountNumber": whereJson.accountNumber,
+                "emailstatus":0,
+                "permission": 5,
+                "serial_number": whereJson.serialNumber,
+                "permission_name": "Patient",
+                "create_time": dtime().format('YYYY-MM-DD HH:mm:ss'),
+                "DeviceExpried":"0",
+                "ExpriedTime":"",
+                "Group":{GroupID:'',GroupName:'',},
+                "Clinic":{GroupID:'',GroupName:'',},
+                "fire_id":'',
+                "rep_times":0,
+                "rep_frequency":0,
+                "deleted": 0,
+            });
+  
+  
+  */ 
   
   
   function checkInput(type,value)
@@ -853,6 +1480,7 @@ const SignupScreen = ({navigation}) => {
       if(fields[i]=="")
       {
         setFormValid(false);
+        console.log(fields[i]);
         color="red";
       }
       else
@@ -900,7 +1528,7 @@ const SignupScreen = ({navigation}) => {
     <Text style={[styles.signUpLabels,{color:confirmPasswordLabelColor}]}>Confirm Password*</Text>
     <TextInput style={styles.textFields} onChangeText={(text)=>{setConfirmPassword(text);validateForm();}} value={confirmPassword}></TextInput>
     <Text style={{color:'red',fontSize:10}}>{confirmPasswordStatus}</Text>
-    <TouchableOpacity onPress={()=>{validateForm();if(formValid){navigation.navigate("SELECT_DEVICE");}else{console.log("Not Valid");}}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Signup</Text></TouchableOpacity>
+    <TouchableOpacity onPress={()=>{validateForm();if(formValid){navigation.navigate("Select Device",{newUserInfo:buildUserObject()});}else{console.log("Not Valid");}}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Signup</Text></TouchableOpacity>
   
     </ScrollView>
     </View>

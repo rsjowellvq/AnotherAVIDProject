@@ -3,12 +3,13 @@ import { NavigationContainer, StackActions } from '@react-navigation/native';
 import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigation/drawer';
 import {Calendar, CalendarList, Agenda} from 'react-native-calendars';
 import { createStackNavigator, HeaderBackButton } from '@react-navigation/stack';
-import BleManager, { read, setName } from 'react-native-ble-manager';
-import React, { useCallback } from 'react';
+import BleManager, { read, setName,checkState } from 'react-native-ble-manager';
+import React, { useCallback,useRef } from 'react';
 import { Table, TableWrapper, Row, Rows, Col, Cols, Cell } from 'react-native-table-component';
 import auth from '@react-native-firebase/auth';
 import moment from 'moment';
 import firestore from '@react-native-firebase/firestore';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 //import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import Buffer from 'buffer';
 import {
@@ -24,8 +25,11 @@ import {
   TextInput,
   Button,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Keyboard,
   NativeModules,
   NativeEventEmitter,
+  TouchableWithoutFeedback,
   Image,
   useColorScheme,
   View,
@@ -185,7 +189,8 @@ const styles = StyleSheet.create({
       {
         fontSize: 15,
         fontFamily: "Verdana-Bold",
-        color:'gray'
+        color:'gray',
+        marginBottom:'3%'
         
       },
     
@@ -248,7 +253,7 @@ const App = () => {
           <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
           <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
-          <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+          <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
           <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
           <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
         </Stack.Navigator>
@@ -357,8 +362,8 @@ const DayUsageScreen = ({route,navigation}) => {
     {
       tableData.map((rowData,index) => (
 
-        <TouchableOpacity buttonKey={index} onPress={()=>{var boolVal;if(index%2==0){boolVal=false;}else{boolVal=true;}navigation.navigate("Usage Data Detail",{dataObject:usageData[index],isUsage:boolVal});}}>
-        <Row textStyle={{fontSize:16,fontWeight:'bold',color:'#555555',textAlign:'center'}} key={index} data={rowData} style={[styles.dayUsageRow,{height:questionHeight},index%2 && {height:usageHeight,backgroundColor:'#d9fae9'}]} />
+        <TouchableOpacity buttonKey={index} onPress={()=>{var boolVal;if(index%2==0){boolVal=true;}else{boolVal=false;}navigation.navigate("Usage Data Detail",{dataObject:usageData[index],isUsage:boolVal});}}>
+        <Row textStyle={{fontSize:16,fontWeight:'bold',color:'#555555',textAlign:'center'}} key={index} data={rowData} style={[styles.dayUsageRow,{height:usageHeight,backgroundColor:'#d9fae9'},index%2 && {height:questionHeight,backgroundColor:'#e0ecff'}]} />
         </TouchableOpacity>
 
       ))
@@ -416,7 +421,11 @@ const UsageDetailScreen = ({route,navigation}) => {
 
 }
 
-
+const DismissKeyboard = ({ children }) => (
+  <TouchableWithoutFeedback 
+  onPress={() => Keyboard.dismiss()}> {children}
+  </TouchableWithoutFeedback>
+  );
 const LoginScreen = ({route,navigation}) => {
 
 
@@ -434,6 +443,43 @@ const LoginScreen = ({route,navigation}) => {
     const [loginProcessStaus,setLoginProcessStatus] = React.useState("");
   console.log("aches");
   var nextLoginScreen = "";
+
+
+  if(route.params != null && route.params.from == "logout")
+  {
+    
+    const logoutRequestOptions = {
+      
+      method:'POST',
+      headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+      body: 'action=signOut&+uid='+currentUserData.uid+"&appversion="+appVersion
+      //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+
+
+    };
+    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+      currentUserData = null;
+      auth().signOut();
+
+    });
+    
+    
+    
+    /*
+
+        export function req_LogOut(uid){
+    return request({
+        url:global.url+'nodejs/login',
+        method:'post',
+        data:'action=signOut'+'&uid='+uid+'&appversion='+global.appVersion,
+    })
+}
+
+    */
+  }
+   
+
     function checkFieldInputs(usernameInput,passwordInput)
     {
       
@@ -459,35 +505,9 @@ const LoginScreen = ({route,navigation}) => {
           Alert.alert("Input Error","Password is blank");
         }
         else
-          processLogin(usernameInput,passwordInput).then((response)=>{
-
-            if(response == "success")
-            {
-              setLoginProcessStatus(""); 
-                      
-              var theNextLoginScreen = (route.params != null && route.params.from == "logout") ? "HOME":"Main";
-              setLoginProcessStatus("Loading Usage Data"); 
-              getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
-
-                //console.log(result);
-                setIsLoading(false);
-                navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
-
-              });
-            }
-            else
-            {
-              setLoginProcessStatus(""); 
-              if(response == "wrong_password")
-              {
-                setIsLoading(false);
-                Alert.alert("Login Error","Password Incorrect");
-              }
-            }
-
-          });
+        {
         //Begin Process Login
-        /*
+        
         const requestOptions = {
       
             method:'POST',
@@ -511,7 +531,12 @@ const LoginScreen = ({route,navigation}) => {
                     fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
 
 
-                          userDeviceInfo = responseJson.data;  
+                    if(responseJson.code == 207)
+                    {
+                      userDeviceInfo = "null";
+                    }      
+                    else
+                      userDeviceInfo = responseJson.data;  
                     
 
 
@@ -576,7 +601,9 @@ const LoginScreen = ({route,navigation}) => {
                         }
                         else
                         {
-                            auth().createUserWithEmailAndPassword(responseJson.data.email,passwordInput).then(()=>{
+                                
+
+                                auth().createUserWithEmailAndPassword(responseJson.data.email,passwordInput).then(()=>{
 
                                 setLoginProcessStatus("Logging In"); 
                                 userAccountPtr.doc(usernameInput).set({eMail:responseJson.data.email});
@@ -593,6 +620,13 @@ const LoginScreen = ({route,navigation}) => {
                                 
                                 //navigation.navigate("HOME",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
                 
+                              }).catch(error=>{
+
+                                setLoginProcessStatus("");
+                                setIsLoading(false);
+                                Alert.alert("Login Error","Username Error");
+                                return;
+
                               });
                         }
 
@@ -600,6 +634,14 @@ const LoginScreen = ({route,navigation}) => {
                     break;
 
 
+                case 201:
+                  //User Deleted
+                  Alert.alert("Username Error","This user has been deleted. Please contact VQ OrthoCare for support");
+                  setIsLoading(false);
+                  setLoginProcessStatus("");
+                  break;
+                
+                
                 case 202:
 
                 case 203:
@@ -607,11 +649,11 @@ const LoginScreen = ({route,navigation}) => {
                     setIsLoading(false);
                     setLoginProcessStatus("");
                     setLoginStatus("Username or Password Error Please Try Again (old system)");
-                    return;
+                    break;
             }
 
 
-          });*/
+          });}
           console.log("bats");
 
           
@@ -624,16 +666,19 @@ const LoginScreen = ({route,navigation}) => {
     
 
     return(
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.loginScreen}>
       
         <Image style={styles.loginScreenImage} source={require("./images/AVID.jpg")} />
-      
+        
       <View style={{width: '85%'}}>
+      
       <Text style={styles.loginLabels}>Username</Text>
       <TextInput InputProps={{disableUnderline: false}} style={styles.textFields} onChangeText={(text)=>setUsername(text)} value={username} name='usernameField'></TextInput>
       <Text style={styles.loginLabels}>Password</Text>
       <View style={{width:'100%',flexDirection:'row'}}>
       <TextInput secureTextEntry={secureTextOn} style={[styles.textFields,{flex:10}]} onChangeText={(text)=>setPassword(text)} value={password} name='passwordField'></TextInput>
+      
       <TouchableHighlight onPress={()=>{console.log("boobs");setSecureTextOn(!secureTextOn);if(secureTextOn){setEyeIcon(require(eyeOpenIcon));}else{setEyeIcon(require(eyeCloseIcon));}}}><Image style={{flex:0}} source={eyeIcon}/></TouchableHighlight>
       </View>
       <View style={{flexDirection: "row",marginTop: 10, width:'100%',justifyContent:'space-between'}}>
@@ -642,14 +687,14 @@ const LoginScreen = ({route,navigation}) => {
       
       </View>
       </View>
-
+     
       
       <TouchableOpacity onPress={()=>{checkFieldInputs(username,password);}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Login</Text></TouchableOpacity>
       <TouchableOpacity onPress={()=>{navigation.navigate("Sign Up") }}><Text style={[styles.purpleButton,{marginTop:'6%'}]}>Sign Up</Text></TouchableOpacity>
       <Text>&nbsp;&nbsp;&nbsp;</Text>
       <ActivityIndicator animating={isLoading}/>
       <Text style={{color:'grey',fontSize:10}}>{loginProcessStaus}</Text>
-      </View>);
+      </View></TouchableWithoutFeedback>);
 } //End Login Screen
 
 
@@ -873,44 +918,113 @@ function getMonthUsageData(month,year){
 const DeviceSelection = ({route,navigation}) => {
 
   
+  function checkIfDeviceIsRegistered(serial_number)
+  {
+    console.log("Hello 33");
+    
+    return new Promise(function(resolve,reject){
+    const dataRequestOptions = {
+  
+      method:'POST',
+      headers: new Headers({
+        'Content-Type': 'application/x-www-form-urlencoded', // <-- Specifying the Content-Type
+      }),
+      body: 'action=checkDevice&serialNumber='+serial_number+'&appversion='+appVersion
+      //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+    };
+
+    fetch("https://avid.vqconnect.io/nodejs/login",dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+    console.log("Hello 44");  
+    resolve(responseJson.msg);
+
+
+    });});
+  }
+
   console.log(JSON.stringify(route.params.newUserInfo));
+  bleManagerEmitter.addListener('BleManagerDidUpdateState',(state)=>{if(state.state != "on")Alert.alert("Bluetooth Error","Please ensure that Bluetooth on your phone is turned on");});
+  BleManager.checkState();
   var [deviceList,setDeviceList] = React.useState([]);
   var [foundDevices,setFoundDevices] = React.useState([]); 
   var [isScanning,setIsScanning] = React.useState(false);
   var [isRegistering,setIsRegistering] = React.useState(false);
-
+  const [firstModalShowing,setFirstModalShowing] = React.useState(true);
+  const [isScanningA,setIsScanningA] = React.useState(false);
+  navigation.setOptions({headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isScanningA}/>)});
   function createNewUser(deviceID)
   {
-   
-    route.params.newUserInfo.serial_number = deviceID;
+    setIsRegistering(true);
+    route.params.newUserInfo.serialNumber = deviceID;
+    console.log(route.params.newUserInfo);
     
-    
-    const dataRequestOptions = {
+    const newDataRequestOptions = {
   
       method:'POST',
-      headers: {'x-access-token':currentUserData.token},
-      body: 'action=appsignuo&dataJson='+JSON.stringify(route.params.newUserInfo)+'&appversion='+appVersion
+      headers: new Headers({
+        'Content-Type': 'application/x-www-form-urlencoded', // <-- Specifying the Content-Type
+      }),
+      body: 'action=appsignup&whereJson='+JSON.stringify(route.params.newUserInfo)+'&appversion='+appVersion
       //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
   
   
     };
 
 
-    fetch("https://avid.vqconnect.io/nodejs/login",dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+    fetch("https://avid.vqconnect.io/nodejs/login",newDataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
 
 
+    
+
+    console.log(responseJson);
     if(responseJson.code == 200)
     {
+      
       auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then(()=>{
 
-        userAccountPtr.doc(username).set({eMail:responseJson.data.email});
+        console.log(currentUserData);
+        console.log("USER "+route.params.newUserInfo.username);
+        console.log("EMAIL"+route.params.newUserInfo.email);
+        userAccountPtr.doc(route.params.newUserInfo.username).set({eMail:route.params.newUserInfo.email});
+
+
+        const loginRequestOptions = {
+      
+          method:'POST',
+          headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+          body: 'action=signIn&whereJson='+JSON.stringify({"username":route.params.newUserInfo.username,"password":route.params.newUserInfo.password})+'&appversion='+appVersion
+          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+    
+    
+        };
+    
+        console.log("step 111");
+        fetch('https://avid.vqconnect.io/nodejs/login',loginRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+        currentUserData = responseJson.data;  
         getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
           //console.log(result);
-          setIsLoading(false);
+          //setIsLoading(false);
+          fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
+
+
+          userDeviceInfo = responseJson.data;  
+          setIsRegistering(false);
           navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
 
+
+          });
+          
+
         });
+
+
+        });
+
+
+
+       
 
 
 
@@ -937,7 +1051,12 @@ const DeviceSelection = ({route,navigation}) => {
     navigation.setOptions({headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isScanning}/>)});
   onChanged = (e,name) =>{
 
-    Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
+    if(name.includes("*"))
+      Alert.alert("Device Error","This device is already registered with another user.");
+    else if(name.includes("-"))
+      Alert.alert("Device Error","This device has not been configured yet. Please contact customer support");
+    else
+      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
 
       {text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}
 
@@ -946,8 +1065,21 @@ const DeviceSelection = ({route,navigation}) => {
   }
     if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid" && !foundDevices.includes(peripheral.advertising.localName.substring(5)))
     {
-      setDeviceList(deviceList => [...deviceList,<Pressable style={{marginTop:'3%',marginBottom:'3%',alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:avidPurpleHex,borderColor:avidPurpleHex}} deviceId={peripheral.advertising.localName.substring(5)} onPress={e=>onChanged(e,peripheral.advertising.localName.substring(5))} ><Text style={{padding:'4%',fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 15}}>{peripheral.advertising.localName.substring(5)}</Text></Pressable>])
-      setFoundDevices(foundDevices =>[...foundDevices,peripheral.advertising.localName.substring(5)]);
+      //console.log("Device Found "+peripheral.advertising.localName.substring(5));
+      checkIfDeviceIsRegistered(peripheral.advertising.localName.substring(5)).then((response)=>{
+
+        console.log("Device Status Is "+response);
+        var char = "";
+        if(response == "DEVICE_ALREADY_REGISTERED")
+          char = "*";
+        if(response == "DEVICE_DOES_NOT_EXIST")
+          char = "-";
+         
+        setDeviceList(deviceList => [...deviceList,<Pressable style={{marginTop:'3%',marginBottom:'3%',alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:'white',borderColor:avidPurpleHex}} deviceId={peripheral.advertising.localName.substring(5)} onPress={e=>onChanged(e,peripheral.advertising.localName.substring(5))} ><Text style={{padding:'4%',fontFamily: "Verdana-Bold",color: avidPurpleHex, textAlign: 'center', fontSize: 15}}>{peripheral.advertising.localName.substring(5)+" "+char}</Text></Pressable>])
+        setFoundDevices(foundDevices =>[...foundDevices,peripheral.advertising.localName.substring(5)]);
+
+      });
+      
     }
 
   }
@@ -956,7 +1088,7 @@ const DeviceSelection = ({route,navigation}) => {
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleSelectFoundDevice);
   bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
 
-    setIsScanning(false);
+    setIsScanningA(false);
     
     //console.log("Scan Stopped "+args.status);
 
@@ -971,10 +1103,23 @@ const DeviceSelection = ({route,navigation}) => {
       <View style={styles.modalView}>
     <Text style={{textAlign:'center'}}>Submitting Your Information</Text>
     </View>
-    </View>
     <ActivityIndicator animating={true}/>
+    </View>
+    
   </Modal>
-  <TouchableOpacity onPress={()=>{BleManager.scan([],20,false);}} style={{alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:"#D8D8D8",borderColor:avidPurpleHex}}><Text style={{padding:'4%',alignSelf:'center', fontSize:20,fontWeight:'bold',color:avidPurpleHex}}>Scan For Nearby Devices</Text></TouchableOpacity>
+  <Modal animationType='none' visible={firstModalShowing} transparent={true}  >
+    <View style={styles.centeredView}>
+      <View style={styles.modalView}>
+    <Text style={{marginBottom:'5%',fontWeight:'bold',fontSize:20,textAlign:'center'}}>Device Selection</Text>
+    <Text style={{textAlign:'center'}}>Please ensure that your desired AVID device is nearby, powered on, and that Bluetooth mode is active.</Text>
+    <Button title="OK" onPress={()=>setFirstModalShowing(false)} />
+    </View>
+    </View>
+    
+  </Modal>
+  <Text style={{marginTop:'6%',alignSelf:'center'}}>* = Device is already registered with another user</Text>
+  <Text style={{alignSelf:'center'}}>- = Device has not been properly configured</Text>
+  <TouchableOpacity onPress={()=>{BleManager.scan([],20,false);setIsScanningA(true)}} style={{alignSelf:'center',marginTop:'8%',width:'80%',borderWidth:2,backgroundColor:avidPurpleHex,borderColor:avidPurpleHex}}><Text style={{padding:'4%',alignSelf:'center', fontSize:20,fontWeight:'bold',color:'white'}}>Scan For Nearby Devices</Text></TouchableOpacity>
 <View>
   {deviceList}
   </View>
@@ -992,7 +1137,7 @@ const DeviceSelection = ({route,navigation}) => {
 const MainScreen = ({route,navigation}) => {
 
   console.log(currentUserData);
-  console.log("Last Upload Was "+userDeviceInfo.lastdatatime);
+  console.log("Last Upload Was "+userDeviceInfo);
   const [uploadStatus,setUploadStatus] = React.useState("");
   const initialMarkedDates = {}
   const [datesUpdated,setDatesUpdated] = React.useState(false);
@@ -1005,6 +1150,7 @@ const MainScreen = ({route,navigation}) => {
   const [foundDevice,setFoundDevice] = React.useState(false);
   const [isScanning,setIsScanning] = React.useState(false);
   const [scanStatus,setScanStatus] = React.useState("");
+  const [lastUploadTime,setLastUploadTime] = React.useState(userDeviceInfo.lastdatatime);
   navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
@@ -1131,7 +1277,31 @@ function convertDateStringForCompare(year,month,day,hour,minute)
                   }
                   else
                   {
-                          if(userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                          
+                    if(readData[0]==93)
+                    {
+                      
+                      if(userDeviceInfo == "null" || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                      {
+                        //console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                        usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                    
+                      }
+                      
+                      
+                    }
+                    if(readData[0]==173)
+                    {
+                      if(userDeviceInfo == "null" || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                      {
+                        //console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
+                        usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
+                      
+                      }
+                    }
+                    
+                    /*
+                    if(userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
                           {
                             if(readData[0]==93)
                             {
@@ -1145,7 +1315,7 @@ function convertDateStringForCompare(year,month,day,hour,minute)
                             }
                           }
                          
-                          
+                          */
                           
                           //console.log(256*address[1]+address[0]+" "+lastUsageAddress);
                           /*if(256*address[0]+address[1] < lastUsageAddress - 16)
@@ -1172,7 +1342,8 @@ function convertDateStringForCompare(year,month,day,hour,minute)
                           }
                           else
                           {
-                              uploadDeviceData(usageArray);
+                            //console.log(usageArray); 
+                             uploadDeviceData(usageArray);
                           }
                           
                       
@@ -1264,9 +1435,47 @@ console.log(jsonData);
   fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
 
   setScanStatus("Upload Complete");
+  setCurrentMonth([new Date().getMonth(),new Date().getFullYear()]);
+  updateCalendar([new Date().getMonth(),new Date().getFullYear()]);
+  fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
 
+
+  if(responseJson.code == 207)
+  {
+    userDeviceInfo = "null";
+  }      
+  else
+    setLastUploadTime(responseJson.data.lastdatatime);
+    //updateMarkedDates(responseJson);  
+  
+
+
+  });
   setIsUpdating(false);
   setUploadStatus(uploadStatus+"\nUpload Complete!");
+  Alert.alert("Upload Complete!","Thank You!",[
+
+    {text:'Yes',onPress:()=>{
+      
+      setScanStatus("");
+      setIsUpdating(false);
+      setIsScanning(false);
+      setScanButtonColor("white");
+      setScanButtonOpacity(1.0);
+    
+    
+    }}
+
+
+  ]);
+  /*
+      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
+
+      {text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}
+
+    ]);
+
+  */
   console.log("Response Is "+responseJson.code+" "+responseJson.msg);
 
   }).catch((error,data)=>{console.log("The Error "+error+" "+data)});
@@ -1275,7 +1484,8 @@ console.log(jsonData);
 
   const handleDiscoverDevice = (peripheral) => {
 
-    if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid")
+    //console.log("Device Is "+peripheral.advertising.localName.substring(0,11));
+    if(peripheral.name != null && peripheral.advertising.localName == "Avid "+currentUserData.serialnumber)
     {
       BleManager.stopScan().then(()=>{
 
@@ -1304,6 +1514,7 @@ console.log(jsonData);
   function updateCalendar(dayInfo)
   {
     setIsUpdating(true);
+    console.log("The Day Is "+dayInfo);
     getMonthUsageData(dayInfo[0],dayInfo[1]).then((result)=>{
 
       console.log(result);
@@ -1343,7 +1554,7 @@ return(
 <TouchableOpacity   disabled={isScanning} alignSelf='center' onPress={()=>{startDeviceScanButton();}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
 <Text style={{fontSize:17,color:'grey',alignSelf:'center'}}>{scanStatus}</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23,marginTop:'8%'}]}>Last Upload Time:</Text>
-<Text style={[styles.grayButton,{alignSelf:'center',fontSize:18}]}>{moment(userDeviceInfo.lastdatatime,'YYYY-MM-DD').format('MMM DD, YYYY')}</Text>
+<Text style={[styles.grayButton,{alignSelf:'center',fontSize:18}]}>{moment(lastUploadTime,'YYYY-MM-DD').format('MMM DD, YYYY')}</Text>
 </View>
 
 );
@@ -1353,7 +1564,7 @@ return(
 const SignupScreen = ({navigation}) => {
 
   
-  const [formValid,setFormValid] = React.useState(true);
+  const [formValid,setFormValid] = React.useState(false);
   const [username,setUsername] = React.useState("");
   const [eMail,setEmail] = React.useState("");
   const [nameEntry,setNameEntry] = React.useState("");
@@ -1373,6 +1584,17 @@ const SignupScreen = ({navigation}) => {
   const [usernameStatus,setUsernameStatus]=React.useState("");
   const [emailStatus,setemailstatus] = React.useState("");
   const [confirmPasswordStatus,setConfirmPasswordStatus] = React.useState("");
+
+  const usernameRef = useRef();
+  const eMailRef = useRef();
+  const doctorRef = useRef();
+  const email1Ref = useRef();
+  const email2Ref = useRef();
+  const email3Ref = useRef();
+  const nameRef = useRef();
+  const acctRef = useRef();
+  const passwordRef = useRef();
+  const confirmRef = useRef();
   
   function buildUserObject()
   {
@@ -1423,8 +1645,14 @@ const SignupScreen = ({navigation}) => {
   
   function checkInput(type,value)
   {
-    const statusMsg = type == "user"?"Username already taken":"E-mail already in use";
     setFormValid(true);
+    if(value == "")
+    {
+      type == "user" ? setUsernameStatus(""):setemailstatus("");
+      return;
+    }
+    const statusMsg = type == "user"?"Username already taken":"E-mail already in use";
+    
     console.log("Validate");
     setTimeout(()=>{
 
@@ -1450,11 +1678,36 @@ const SignupScreen = ({navigation}) => {
         
       if(resjson.code == "202")
         setFormValid(false);
+       
+        
       
       if(type=="user")
-          resjson.code == "202"?setUsernameStatus(statusMsg):setUsernameStatus("");  
+      {
+        if(resjson.code == "202")
+        {
+          setUsernameStatus(statusMsg);
+          setUserLabelColor("red");
+        }
         else
-          resjson.code == "202"?setemailstatus(statusMsg):setemailstatus("");  
+        {
+          setUsernameStatus("");
+          setUserLabelColor("grey");
+        }
+      }
+      else
+      {
+        if(resjson.code == "202")
+        {
+          setemailstatus(statusMsg);
+          setEmailLabelColor("red");
+        }
+        else
+        {
+          setemailstatus("");
+          setEmailLabelColor("grey");
+        }
+      }
+      
       
       });
      
@@ -1467,11 +1720,12 @@ const SignupScreen = ({navigation}) => {
   
   function validateForm()
   {
-    
-    setFormValid(true);
+    return new Promise(function(resolve,reject){
+    var status = true;
     var color="";
     const fields = [username,eMail,nameEntry,password];
     const labels = [setUserLabelColor,setEmailLabelColor,setNameLabelColor,setPasswordLabelColor];
+    let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w\w+)+$/;
 
     //Checking for Blank Fields
     for(var i = 0;i<fields.length;i++)
@@ -1479,7 +1733,7 @@ const SignupScreen = ({navigation}) => {
       
       if(fields[i]=="")
       {
-        setFormValid(false);
+        status=false;
         console.log(fields[i]);
         color="red";
       }
@@ -1492,46 +1746,112 @@ const SignupScreen = ({navigation}) => {
       labels[i](color);
       console.log("Form Valid "+formValid);
     }
-
-    if(confirmPassword != "" && password != confirmPassword)
+    if(password != "" || confirmPassword != "")
     {
-      setFormValid(false);
+      if(password != confirmPassword)
+      {
+        setPasswordLabelColor("red");
+        setConfirmPasswordLabelColor("red");
+        setConfirmPasswordStatus("Passwords Don't Match");
+        status = false;
+      }
+      else
+      {
+        setPasswordLabelColor("grey");
+        setConfirmPasswordLabelColor("grey");
+        setConfirmPasswordStatus("");
+      }
+    if(reg.test(eMail) === false)
+    {
+          setemailstatus("E-mail format is not correct");
+          setEmailLabelColor("red");
+          status=false;
     }
-    
+    else
+    {
+          setemailstatus("");
+          setEmailLabelColor("grey");
+    }
+    }
+   
+    if(status == false)
+      Alert.alert("Signup Error","There are errors on your form. Please correct them before continuing");
+    resolve(status);
+  });
     
   
   }
 
+  function goToNextField(index)
+  {
+
+  }
+
   return(
-    <View style={{backgroundColor:'white',alignItems:'center'}}>
-    <ScrollView style={{marginTop:'5%',width:'85%'}}>
+    <View style={{height:'100%',backgroundColor:'white'}}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <KeyboardAwareScrollView contentContainerstyle={{width:'65%',marginTop:'5%',backgroundColor:'white',alignItems:'center'}}>
+    
+     
+    {/*<ScrollView style={{marginTop:'5%',width:'85%'}} >*/}
+    <View style={{flex:5,alignSelf:'center',height:'50%',width:'85%',marginTop:'5%'}}>
+    <View style={{flexDirection:'row',marginBottom:'2%'}}>
     <Text style={[styles.signUpLabels,{color:userLabelColor}]}>Username*</Text>
-    <TextInput style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
-    <Text style={{color:'red',fontSize:10,marginBottom:'7%'}}>{usernameStatus}</Text>
-    <Text style={[styles.signUpLabels,{color:emaillabelColor}]}>E-Mail*</Text>
-    <TextInput style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
-    <Text style={{color:'red',fontSize:10,marginBottom:'7%'}}>{emailStatus}</Text>
-    <Text style={styles.signUpLabels}>Doctor E-mail</Text>
-    <TextInput style={styles.textFields}></TextInput>
-    <Text style={styles.signUpLabels}>Additional E-Mail 1</Text>
-    <TextInput style={styles.textFields}></TextInput>
-    <Text style={styles.signUpLabels}>Additional E-mail 2</Text>
-    <TextInput style={styles.textFields}></TextInput>
-    <Text style={styles.signUpLabels}>Additional E-mail 3</Text>
-    <TextInput style={styles.textFields}></TextInput>
-    <Text style={[styles.signUpLabels,{color:nameLabelColor}]}>Name*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setNameEntry(text);validateForm();}} value={nameEntry}></TextInput>
-    <Text style={styles.signUpLabels}>Account Number</Text>
-    <TextInput style={styles.textFields}></TextInput>
-    <Text style={[styles.signUpLabels,{color:passwordLabelColor}]}>Password*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setPassword(text);validateForm();}} value={password}></TextInput>
-    <Text style={[styles.signUpLabels,{color:confirmPasswordLabelColor}]}>Confirm Password*</Text>
-    <TextInput style={styles.textFields} onChangeText={(text)=>{setConfirmPassword(text);validateForm();}} value={confirmPassword}></TextInput>
-    <Text style={{color:'red',fontSize:10}}>{confirmPasswordStatus}</Text>
-    <TouchableOpacity onPress={()=>{validateForm();if(formValid){navigation.navigate("Select Device",{newUserInfo:buildUserObject()});}else{console.log("Not Valid");}}} style={{ marginTop:30,marginBottom:20, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Signup</Text></TouchableOpacity>
-  
-    </ScrollView>
+    <Text style={{color:'red',fontSize:10,marginBottom:'2%'}}>{usernameStatus}</Text>
     </View>
+    <TextInput onSubmitEditing={()=>eMailRef.current.focus()} ref={usernameRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
+    
+    <View style={{flexDirection:'row',marginBottom:'2%',marginTop:'3%'}}>
+    <Text style={[styles.signUpLabels,{color:emaillabelColor}]}>E-Mail*</Text>
+    <Text style={{color:'red',fontSize:10,marginBottom:'2%'}}>{emailStatus}</Text>
+    </View>
+    <TextInput onSubmitEditing={()=>doctorRef.current.focus()} ref={eMailRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
+    
+    
+    <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Doctor E-mail</Text>
+    <TextInput onSubmitEditing={()=>email1Ref.current.focus()} ref={doctorRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setDoctorEmail(text);}} value={doctorEmail}  ></TextInput>
+    
+   
+    <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-Mail 1</Text>
+    <TextInput onSubmitEditing={()=>email2Ref.current.focus()} ref={email1Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail1(text);}} value={email1}></TextInput>
+    
+    <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-mail 2</Text>
+    <TextInput onSubmitEditing={()=>email3Ref.current.focus()} ref={email2Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail2(text);}} value={email2}></TextInput>
+   
+    <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-mail 3</Text>
+    <TextInput onSubmitEditing={()=>nameRef.current.focus()} ref={email3Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail3(text);}} value={email3}></TextInput>
+    
+    
+    <Text style={[styles.signUpLabels,{color:nameLabelColor,marginBottom:'3%',marginTop:'5%'}]}>Name*</Text>
+    <TextInput onSubmitEditing={()=>acctRef.current.focus()} ref={nameRef} style={[styles.textFields,{marginBottom:'6%',marginTop:'5%'}]} onChangeText={(text)=>{setNameEntry(text);}} value={nameEntry}></TextInput>
+    
+    <Text style={[styles.signUpLabels]}>Account Number</Text>
+    <TextInput onSubmitEditing={()=>passwordRef.current.focus()} ref={acctRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setAccountNumber(text);}} value={accountNumber}></TextInput>
+    
+    <Text style={[styles.signUpLabels,{color:passwordLabelColor}]}>Password*</Text>
+    <TextInput onSubmitEditing={()=>confirmRef.current.focus()} ref={passwordRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setPassword(text);}} value={password}></TextInput>
+    
+   
+    <View style={{flexDirection:'row',marginBottom:'3%'}}>
+    <Text style={[styles.signUpLabels,{color:confirmPasswordLabelColor}]}>Confirm Password*</Text>
+    <Text style={{color:'red',fontSize:10}}>{confirmPasswordStatus}</Text>
+    </View>
+    <TextInput ref={confirmRef} style={[styles.textFields,{marginBottom:'1%'}]} onChangeText={(text)=>{setConfirmPassword(text);}} value={confirmPassword}></TextInput>
+    
+    
+   
+    </View>
+    
+    
+    
+
+    </KeyboardAwareScrollView>
+    </TouchableWithoutFeedback>
+    
+    <TouchableOpacity onPress={()=>{validateForm().then(result=>{if(result==true){navigation.navigate("Select Device",{newUserInfo:buildUserObject()})}else{console.log("FormNotValid");}});}} style={{ alignSelf:'center', marginTop:50,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Verdana-Bold",color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Signup</Text></TouchableOpacity>
+   
+    </View>
+    
   );
 
 

@@ -1,6 +1,0 @@
-framework module Pods_AnotherAVIDProject_AnotherAVIDProjectTests {
-  umbrella header "Pods-AnotherAVIDProject-AnotherAVIDProjectTests-umbrella.h"
-
-  export *
-  module * { export * }
-}

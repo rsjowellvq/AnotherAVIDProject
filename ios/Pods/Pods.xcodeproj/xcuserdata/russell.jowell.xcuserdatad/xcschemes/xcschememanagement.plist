@@ -64,12 +64,12 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
-		<key>Pods-AnotherAVIDProject-AnotherAVIDProjectTests.xcscheme</key>
+		<key>Pods-AVID-AVIDTests.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
 		</dict>
-		<key>Pods-AnotherAVIDProject.xcscheme</key>
+		<key>Pods-AVID.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>

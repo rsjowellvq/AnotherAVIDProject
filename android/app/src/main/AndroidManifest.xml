@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  package="com.vq.qvid">
+  package="com.vq.avid">
 
     <uses-permission android:name="android.permission.INTERNET" />
 

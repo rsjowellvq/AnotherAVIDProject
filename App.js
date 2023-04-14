@@ -37,6 +37,7 @@ import {
   TouchableHighlight,
 } from 'react-native';
 import { acc } from 'react-native-reanimated';
+import { emit } from 'process';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
         color: 'gray',
      
         fontFamily:'Verdana-bold',
-        marginBottom: '8%'
+        marginBottom: '6%'
       },
     
       loginLabels:
@@ -253,6 +254,8 @@ const App = () => {
           <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
           <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
+          <Stack.Screen name="Forgot Username" component={ForgotUsernameScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+          <Stack.Screen name="Forgot Password" component={ForgotPasswordScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
           <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
           <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
           <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
@@ -421,11 +424,191 @@ const UsageDetailScreen = ({route,navigation}) => {
 
 }
 
-const DismissKeyboard = ({ children }) => (
-  <TouchableWithoutFeedback 
-  onPress={() => Keyboard.dismiss()}> {children}
-  </TouchableWithoutFeedback>
-  );
+
+const ForgotPasswordScreen = ({route,navigation}) => {
+
+
+  const [forgotPasswordText,setForgotPasswordText] = React.useState("");
+  const [usernameInput,setUsernameInput] = React.useState("");
+  const [isFirebase,setIsFirebase] = React.useState(true);
+  const [submitPressed,setSubmitPressed] = React.useState(false);
+  const [passwordStatus,setPasswordStatus] = React.useState("");
+  const [passwordEntry,setPasswordEntry] = React.useState("");
+  const [confirmEntry,setConfirmEntry] = React.useState("");
+  const currentUsername = "";
+  
+  function resetPassword(eMailInput)
+  {
+
+    if(eMailInput == "")
+    {
+      setForgotUsernameText("E-mail is blank");
+      return;
+    }
+  
+    userAccountPtr.doc(usernameInput).get().then((document)=>
+      {
+         if(document.exists)
+          {
+            setIsFirebase(true);
+            auth().sendPasswordResetEmail(document.data().eMail).then(()=>{
+              setForgotPasswordText("Please check your e-mail to reset your password");
+              return;
+            });
+          }
+          else
+          {
+            setIsFirebase(false);
+          }
+
+          
+
+
+      }
+    );
+
+
+  
+    
+    
+    //auth().sendPasswordResetEmail
+  
+}
+
+function processPassword()
+{
+  console.log("cheesey");
+  
+  if(passwordEntry == "" || confirmEntry == "")
+  {
+    setPasswordStatus("One field is empty");
+    return;
+  }
+  
+  if(passwordEntry != confirmEntry)
+  {
+    setPasswordStatus("Passwords do not match!");
+    return;
+  }
+
+  const requestOptions = {
+      
+    method:'POST',
+    headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+    body: 'action=changepassword&whereJson='+JSON.stringify({"username":usernameInput,"password":passwordEntry})+'&appversion='+appVersion
+    //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+
+
+  };
+
+  fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+    if(responseJson.code == 200)
+    {
+      setPasswordStatus("Password Successfully Changed");
+    }
+    else
+    {
+      setPasswordStatus("User Not Found!");
+    }
+
+  });
+
+
+
+}
+
+/*
+
+export function req_ChangePassword(email,password){
+    return request({
+        url:global.url+'nodejs/login',
+        method:'post',
+        data:'action=changepassword'+'&whereJson='+JSON.stringify({"email":email,"password":password})+'&appversion='+global.appVersion,
+    })
+}
+
+
+*/
+
+
+
+
+  return(<View style={styles.loginScreen}>
+    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%'}]}>Please enter your username{"\n"}to change your password</Text>
+    <TextInput onChangeText={(text)=>setUsernameInput(text)} value={usernameInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    {isFirebase == true && <TouchableOpacity onPress={()=>{resetPassword(usernameInput)}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Submit</Text></TouchableOpacity>}
+    {isFirebase == true && <Text style={{textAlign:'center',fontSize:15}}>{forgotPasswordText}</Text>}
+    {isFirebase == false && <View style={{width:'80%',alignItems:'center'}}><Text>Please enter your new password</Text>
+    <TextInput onChangeText={(text)=>setPasswordEntry(text)} value={passwordEntry} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    <Text>Confirm your new password</Text>
+    <TextInput onChangeText={(text)=>setConfirmEntry(text)} value={confirmEntry} style={[styles.textFields,{width:'80%'}]}></TextInput><Text style={{color:'red'}}>{passwordStatus}</Text><TouchableOpacity onPress={()=>{processPassword()}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Reset Password</Text></TouchableOpacity>
+</View>}
+    
+  </View>);
+
+};
+
+
+
+
+const ForgotUsernameScreen = ({route,navigation}) => {
+
+
+  const [forgotUsernameText,setForgotUsernameText] = React.useState("");
+  const [eMailInput,setEmailInput] = React.useState("");
+
+
+  function findUsername(eMailInput)
+  {
+
+    if(eMailInput == "")
+    {
+      setForgotUsernameText("E-mail is blank");
+      return;
+    }
+  
+
+  const requestOptions = {
+      
+    method:'POST',
+    headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+    body: 'action=newSendUsername&whereJson='+JSON.stringify({"email":eMailInput})+'&appversion='+appVersion
+    //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+
+
+  };
+
+  fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+    if(responseJson.code==200)
+    {
+      setForgotUsernameText("Your Username Is: \n"+responseJson.data.username);
+    }
+    else
+    {
+      setForgotUsernameText("E-mail not found");
+    }
+
+  });
+}
+
+
+
+
+
+
+  return(<View style={styles.loginScreen}>
+    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%'}]}>Please enter your e-mail address{"\n"}to retrieve your username</Text>
+    <TextInput onChangeText={(text)=>setEmailInput(text)} value={eMailInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    <TouchableOpacity onPress={()=>{findUsername(eMailInput)}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Submit</Text></TouchableOpacity>
+
+    <Text style={{textAlign:'center',fontSize:15}}>{forgotUsernameText}</Text>
+  </View>);
+
+};
+
+
 const LoginScreen = ({route,navigation}) => {
 
 
@@ -457,26 +640,10 @@ const LoginScreen = ({route,navigation}) => {
 
 
     };
-    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{
-
-      currentUserData = null;
-      auth().signOut();
-
-    });
+    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{currentUserData = null;auth().signOut();});
     
     
-    
-    /*
-
-        export function req_LogOut(uid){
-    return request({
-        url:global.url+'nodejs/login',
-        method:'post',
-        data:'action=signOut'+'&uid='+uid+'&appversion='+global.appVersion,
-    })
-}
-
-    */
+  
   }
    
 
@@ -530,14 +697,16 @@ const LoginScreen = ({route,navigation}) => {
                     currentUserData = responseJson.data;
                     fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
 
-
+                    userDeviceInfo = responseJson.code == 207 ? "null":responseJson.data;
+                    
+                    /*
                     if(responseJson.code == 207)
                     {
                       userDeviceInfo = "null";
                     }      
                     else
                       userDeviceInfo = responseJson.data;  
-                    
+                    */
 
 
                     });
@@ -547,7 +716,7 @@ const LoginScreen = ({route,navigation}) => {
                        
                       if(document.exists)
                         {
-                            auth().signInWithEmailAndPassword(document.data().eMail,passwordInput).then(()=>{
+                            auth().signInWithEmailAndPassword(document.data().eMail,passwordInput).then((userCredential)=>{
 
                                 
                                 setLoginProcessStatus(""); 
@@ -578,6 +747,10 @@ const LoginScreen = ({route,navigation}) => {
                                     console.log("happy mealllla "+currentUserData.serialnumber);
                                     console.log(result);
                                     setIsLoading(false);
+                                    if(!userCredential.user.emailVerified)
+                                      Alert.alert("E-mail Not Verified","Please check your e-mail to verify your account",[{text:'Resend E-mail',onPress:()=>{userCredential.user.sendEmailVerification();}},{text:"OK"}]);
+
+                                   
                                     navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
   
                                   });
@@ -603,9 +776,10 @@ const LoginScreen = ({route,navigation}) => {
                         {
                                 
 
-                                auth().createUserWithEmailAndPassword(responseJson.data.email,passwordInput).then(()=>{
+                                auth().createUserWithEmailAndPassword(responseJson.data.email,passwordInput).then((userCredential)=>{
 
-                                setLoginProcessStatus("Logging In"); 
+                                  userCredential.user.sendEmailVerification();
+                                  setLoginProcessStatus("Logging In"); 
                                 userAccountPtr.doc(usernameInput).set({eMail:responseJson.data.email});
                                 setIsLoading(false);
                                 nextLoginScreen = "HOME";
@@ -682,8 +856,8 @@ const LoginScreen = ({route,navigation}) => {
       <TouchableHighlight onPress={()=>{console.log("boobs");setSecureTextOn(!secureTextOn);if(secureTextOn){setEyeIcon(require(eyeOpenIcon));}else{setEyeIcon(require(eyeCloseIcon));}}}><Image style={{flex:0}} source={eyeIcon}/></TouchableHighlight>
       </View>
       <View style={{flexDirection: "row",marginTop: 10, width:'100%',justifyContent:'space-between'}}>
-      <TouchableOpacity><Text style={styles.grayButton}>Forgot Username?</Text></TouchableOpacity>
-      <TouchableOpacity><Text style={styles.grayButton}>Forgot Password?</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{navigation.navigate("Forgot Username")}}><Text style={styles.grayButton}>Forgot Username?</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{navigation.navigate("Forgot Password")}}><Text style={styles.grayButton}>Forgot Password?</Text></TouchableOpacity>
       
       </View>
       </View>
@@ -699,7 +873,7 @@ const LoginScreen = ({route,navigation}) => {
 
 
 
-
+/*
 function processLogin(username,password)
 {
   return new Promise(function(resolve,reject){
@@ -728,89 +902,17 @@ function processLogin(username,password)
             {
               if(document.exists)
               {
-                      auth().signInWithEmailAndPassword(document.data().eMail,password).then(()=>{
-                      resolve("success");  
-                      /*setLoginProcessStatus(""); 
-                      
-                      var theNextLoginScreen = (route.params != null && route.params.from == "logout") ? "HOME":"Main";
-                      setLoginProcessStatus("Loading Usage Data"); 
-                      getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
-
-                        //console.log(result);
-                        setIsLoading(false);
-                        navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
-
-                      });*/
-                      /*
-                      if(route.params != null && route.params.from == "logout")
-                      {
-                        console.log("happy meal -a ");
-                                  nextLoginScreen = "HOME";
-                                  //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
-                                  setLoginProcessStatus("Loading Usage Data"); 
-                                  getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
-
-                                    console.log(result);
-                                    setIsLoading(false);
-                                    navigation.navigate(theNextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
-  
-                                  });
-                                  //navigation.navigate("HOME",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
-                                  //navigation.navigate("HOME");
-                                }
-                                else
-                                {
-                                  
-                                  nextLoginScreen = "Main";
-                                  //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
-                                  setLoginProcessStatus("Loading Usage Data"); 
-                                  getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
-
-                                    console.log("happy mealllla "+currentUserData.serialnumber);
-                                    console.log(result);
-                                    setIsLoading(false);
-                                    navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
-  
-                                  });
-                                  //navigation.navigate("Main",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
-                                  //navigation.navigate("Main");
-                                }*/
-                                    
-
-
-                            }).catch(error=>{
-
-                              resolve("wrong_password");
-                              /*setLoginProcessStatus(""); 
-                                if(error.code == "auth/wrong-password")
-                                {
-                                  setIsLoading(false);
-                                  Alert.alert("Login Error","Password Incorrect");
-                                  return;
-                                }*/
-          
-                              });
-                        }
-                        else
-                        {
-                            auth().createUserWithEmailAndPassword(responseJson.data.email,password).then(()=>{
-
-                                setLoginProcessStatus("Logging In"); 
-                                userAccountPtr.doc(username).set({eMail:responseJson.data.email});
-                                setIsLoading(false);
-                                //nextLoginScreen = "HOME";
-                                //getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear());
-                                setLoginProcessStatus("Loading Usage Data"); 
-                                getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
-
-                                  //console.log(result);
-                                  navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
-
-                                });
-                                
-                                //navigation.navigate("HOME",{calendarInfo:getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear())});
-                
-                              });
+                auth().signInWithEmailAndPassword(document.data().eMail,password).then(()=>{resolve("success");  }).catch(error=>{resolve("wrong_password");});
+              }
+              else
+              {
+                auth().createUserWithEmailAndPassword(responseJson.data.email,password).then(()=>{
+                  setLoginProcessStatus("Logging In"); 
+                  userAccountPtr.doc(username).set({eMail:responseJson.data.email});
+                  setIsLoading(false);
+                  setLoginProcessStatus("Loading Usage Data"); 
+                  getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});});
+                   });
                         }
 
                     });
@@ -831,7 +933,7 @@ function processLogin(username,password)
               }
 
     }); //End Fetch
-})}// <----
+})}*/
 
 
 
@@ -933,13 +1035,7 @@ const DeviceSelection = ({route,navigation}) => {
       //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
     };
 
-    fetch("https://avid.vqconnect.io/nodejs/login",dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
-
-    console.log("Hello 44");  
-    resolve(responseJson.msg);
-
-
-    });});
+    fetch("https://avid.vqconnect.io/nodejs/login",dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{resolve(responseJson.msg);});});
   }
 
   console.log(JSON.stringify(route.params.newUserInfo));
@@ -957,7 +1053,7 @@ const DeviceSelection = ({route,navigation}) => {
     setIsRegistering(true);
     route.params.newUserInfo.serialNumber = deviceID;
     console.log(route.params.newUserInfo);
-    
+    console.log("Point A");
     const newDataRequestOptions = {
   
       method:'POST',
@@ -970,23 +1066,22 @@ const DeviceSelection = ({route,navigation}) => {
   
     };
 
-
+    console.log("Point B");
     fetch("https://avid.vqconnect.io/nodejs/login",newDataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
 
 
-    
+    console.log("Point C");
 
     console.log(responseJson);
     if(responseJson.code == 200)
     {
-      
-      auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then(()=>{
+      console.log("Point D");
+      auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then((userCredential)=>{
 
-        console.log(currentUserData);
-        console.log("USER "+route.params.newUserInfo.username);
-        console.log("EMAIL"+route.params.newUserInfo.email);
+        userCredential.user.sendEmailVerification();
+        
         userAccountPtr.doc(route.params.newUserInfo.username).set({eMail:route.params.newUserInfo.email});
-
+        console.log("Point E");
 
         const loginRequestOptions = {
       
@@ -997,20 +1092,21 @@ const DeviceSelection = ({route,navigation}) => {
     
     
         };
-    
+        console.log("Point F");
         console.log("step 111");
         fetch('https://avid.vqconnect.io/nodejs/login',loginRequestOptions).then((response)=>response.json()).then((responseJson)=>{
-
+          console.log("Point G");
         currentUserData = responseJson.data;  
         getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
           //console.log(result);
           //setIsLoading(false);
           fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
-
+            console.log("Point H");
 
           userDeviceInfo = responseJson.data;  
           setIsRegistering(false);
+          auth().sendEmailVerification();
           navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
 
 
@@ -1056,11 +1152,7 @@ const DeviceSelection = ({route,navigation}) => {
     else if(name.includes("-"))
       Alert.alert("Device Error","This device has not been configured yet. Please contact customer support");
     else
-      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
-
-      {text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}
-
-    ]);
+      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[{text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}]);
 
   }
     if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid" && !foundDevices.includes(peripheral.advertising.localName.substring(5)))
@@ -1086,13 +1178,10 @@ const DeviceSelection = ({route,navigation}) => {
 
   bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleSelectFoundDevice);
-  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
-
-    setIsScanningA(false);
+  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{setIsScanningA(false);});
     
-    //console.log("Scan Stopped "+args.status);
-
-  });
+    
+  
 
 
 
@@ -1154,10 +1243,14 @@ const MainScreen = ({route,navigation}) => {
   navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
+  
+  //updateMarkedDates(route.params.calendarInfo);
+  
+  
   function calculation(add_0,add_1)
-{
-  return parseInt( (changeNumBase(add_1)+ changeNumBase(add_0)) ,16);
-} 
+  {
+    return parseInt( (changeNumBase(add_1)+ changeNumBase(add_0)) ,16);
+  } 
 
 function changeNumBase(number)
 {
@@ -1300,35 +1393,7 @@ function convertDateStringForCompare(year,month,day,hour,minute)
                       }
                     }
                     
-                    /*
-                    if(userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
-                          {
-                            if(readData[0]==93)
-                            {
-                                console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
-                                usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
-                            }
-                            if(readData[0]==173)
-                            {
-                              console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
-                              usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
-                            }
-                          }
-                         
-                          */
-                          
-                          //console.log(256*address[1]+address[0]+" "+lastUsageAddress);
-                          /*if(256*address[0]+address[1] < lastUsageAddress - 16)
-                          {
-                              if(address[1] == 240)
-                              {
-                                  newGetDeviceData(peripheral,[address[0]+1,0]);
-                              }
-                              else
-                              {
-                                  newGetDeviceData(peripheral,[address[0],address[1]+16]);
-                              }
-                          }*/
+              
                           if(256*address[0]+address[1]>896)
                           {
                             if(address[1] == 0)
@@ -1468,14 +1533,7 @@ console.log(jsonData);
 
 
   ]);
-  /*
-      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[
-
-      {text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}
-
-    ]);
-
-  */
+  
   console.log("Response Is "+responseJson.code+" "+responseJson.msg);
 
   }).catch((error,data)=>{console.log("The Error "+error+" "+data)});
@@ -1565,6 +1623,7 @@ const SignupScreen = ({navigation}) => {
 
   
   const [formValid,setFormValid] = React.useState(false);
+  //const [emailStatus,setemailstatus] = [usernameStatus,setUsernameStatus] = [confirmPassword,setConfirmPassword] = [accountNumber,setAccountNumber] = [username,setUsername] = [eMail,setEmail] = [nameEntry,setNameEntry] = [password,setPassword],[doctorEmail,setDoctorEmail],[email1,setemail1],[email2,setemail2],[email3,setemail3] = React.useState("");
   const [username,setUsername] = React.useState("");
   const [eMail,setEmail] = React.useState("");
   const [nameEntry,setNameEntry] = React.useState("");
@@ -1760,8 +1819,8 @@ const SignupScreen = ({navigation}) => {
         setPasswordLabelColor("grey");
         setConfirmPasswordLabelColor("grey");
         setConfirmPasswordStatus("");
-      }
-    if(reg.test(eMail) === false)
+      }}
+    if(eMail.indexOf('@') <= -1 || eMail.indexOf(' ') > -1 || eMail.indexOf('.') <=1)
     {
           setemailstatus("E-mail format is not correct");
           setEmailLabelColor("red");
@@ -1772,7 +1831,7 @@ const SignupScreen = ({navigation}) => {
           setemailstatus("");
           setEmailLabelColor("grey");
     }
-    }
+    
    
     if(status == false)
       Alert.alert("Signup Error","There are errors on your form. Please correct them before continuing");
@@ -1782,10 +1841,7 @@ const SignupScreen = ({navigation}) => {
   
   }
 
-  function goToNextField(index)
-  {
-
-  }
+ 
 
   return(
     <View style={{height:'100%',backgroundColor:'white'}}>
@@ -1799,37 +1855,37 @@ const SignupScreen = ({navigation}) => {
     <Text style={[styles.signUpLabels,{color:userLabelColor}]}>Username*</Text>
     <Text style={{color:'red',fontSize:10,marginBottom:'2%'}}>{usernameStatus}</Text>
     </View>
-    <TextInput onSubmitEditing={()=>eMailRef.current.focus()} ref={usernameRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
+    <TextInput onSubmitEditing={()=>eMailRef.current.focus()} ref={usernameRef} style={styles.textFields} onChangeText={(text)=>{setUsername(text);checkInput("user",text);}} value={username}></TextInput>
     
     <View style={{flexDirection:'row',marginBottom:'2%',marginTop:'3%'}}>
     <Text style={[styles.signUpLabels,{color:emaillabelColor}]}>E-Mail*</Text>
     <Text style={{color:'red',fontSize:10,marginBottom:'2%'}}>{emailStatus}</Text>
     </View>
-    <TextInput onSubmitEditing={()=>doctorRef.current.focus()} ref={eMailRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
+    <TextInput onSubmitEditing={()=>doctorRef.current.focus()} ref={eMailRef} style={styles.textFields} onChangeText={(text)=>{setEmail(text);checkInput("email",text);}} value={eMail}></TextInput>
     
     
     <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Doctor E-mail</Text>
-    <TextInput onSubmitEditing={()=>email1Ref.current.focus()} ref={doctorRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setDoctorEmail(text);}} value={doctorEmail}  ></TextInput>
+    <TextInput onSubmitEditing={()=>email1Ref.current.focus()} ref={doctorRef} style={styles.textFields} onChangeText={(text)=>{setDoctorEmail(text);}} value={doctorEmail}  ></TextInput>
     
    
     <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-Mail 1</Text>
-    <TextInput onSubmitEditing={()=>email2Ref.current.focus()} ref={email1Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail1(text);}} value={email1}></TextInput>
+    <TextInput onSubmitEditing={()=>email2Ref.current.focus()} ref={email1Ref} style={styles.textFields} onChangeText={(text)=>{setemail1(text);}} value={email1}></TextInput>
     
     <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-mail 2</Text>
-    <TextInput onSubmitEditing={()=>email3Ref.current.focus()} ref={email2Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail2(text);}} value={email2}></TextInput>
+    <TextInput onSubmitEditing={()=>email3Ref.current.focus()} ref={email2Ref} style={styles.textFields} onChangeText={(text)=>{setemail2(text);}} value={email2}></TextInput>
    
     <Text style={[styles.signUpLabels,{marginBottom:'3%',marginTop:'3%'}]}>Additional E-mail 3</Text>
-    <TextInput onSubmitEditing={()=>nameRef.current.focus()} ref={email3Ref} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setemail3(text);}} value={email3}></TextInput>
+    <TextInput onSubmitEditing={()=>nameRef.current.focus()} ref={email3Ref} style={styles.textFields} onChangeText={(text)=>{setemail3(text);}} value={email3}></TextInput>
     
     
     <Text style={[styles.signUpLabels,{color:nameLabelColor,marginBottom:'3%',marginTop:'5%'}]}>Name*</Text>
-    <TextInput onSubmitEditing={()=>acctRef.current.focus()} ref={nameRef} style={[styles.textFields,{marginBottom:'6%',marginTop:'5%'}]} onChangeText={(text)=>{setNameEntry(text);}} value={nameEntry}></TextInput>
+    <TextInput onSubmitEditing={()=>acctRef.current.focus()} ref={nameRef} style={[styles.textFields,{marginTop:'5%'}]} onChangeText={(text)=>{setNameEntry(text);}} value={nameEntry}></TextInput>
     
     <Text style={[styles.signUpLabels]}>Account Number</Text>
-    <TextInput onSubmitEditing={()=>passwordRef.current.focus()} ref={acctRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setAccountNumber(text);}} value={accountNumber}></TextInput>
+    <TextInput onSubmitEditing={()=>passwordRef.current.focus()} ref={acctRef} style={styles.textFields} onChangeText={(text)=>{setAccountNumber(text);}} value={accountNumber}></TextInput>
     
     <Text style={[styles.signUpLabels,{color:passwordLabelColor}]}>Password*</Text>
-    <TextInput onSubmitEditing={()=>confirmRef.current.focus()} ref={passwordRef} style={[styles.textFields,{marginBottom:'6%'}]} onChangeText={(text)=>{setPassword(text);}} value={password}></TextInput>
+    <TextInput onSubmitEditing={()=>confirmRef.current.focus()} ref={passwordRef} style={styles.textFields} onChangeText={(text)=>{setPassword(text);}} value={password}></TextInput>
     
    
     <View style={{flexDirection:'row',marginBottom:'3%'}}>

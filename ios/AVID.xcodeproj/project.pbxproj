@@ -13,8 +13,9 @@
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
 		5524FCB75A654294A3CF9ADB /* Proxima-Nova-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 2DA529ECE4FE4B378C9F9238 /* Proxima-Nova-Bold.otf */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		8A0E81D32967856900FBAC48 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8A0E81D22967856900FBAC48 /* GoogleService-Info.plist */; };
-		8A0E81D42967856900FBAC48 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8A0E81D22967856900FBAC48 /* GoogleService-Info.plist */; };
+		8A0E81D32967856900FBAC48 /* GoogleService-Info-1.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */; };
+		8A0E81D42967856900FBAC48 /* GoogleService-Info-1.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */; };
+		8A403A7C29CA1B82001BB1B3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8A403A7B29CA1B82001BB1B3 /* GoogleService-Info.plist */; };
 		97082258A4FD6A103C58D379 /* Pods_AVID.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A85736E6823DCE24D9C768E /* Pods_AVID.framework */; };
 		9E652CA3093C2AA34825A3B0 /* Pods_AVID_AVIDTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F2D2D1F682BF253DEECE4 /* Pods_AVID_AVIDTests.framework */; };
 		DD97CB19ABE14A6E8AD4C1F0 /* Proxima-Nova-Semibold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 9DB39466C8D3407C80A38C4F /* Proxima-Nova-Semibold.otf */; };
@@ -48,7 +49,8 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = AVID/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		832F2D2D1F682BF253DEECE4 /* Pods_AVID_AVIDTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_AVID_AVIDTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-AVID-AVIDTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AVID-AVIDTests.release.xcconfig"; path = "Target Support Files/Pods-AVID-AVIDTests/Pods-AVID-AVIDTests.release.xcconfig"; sourceTree = "<group>"; };
-		8A0E81D22967856900FBAC48 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info-1.plist"; path = "../../../Downloads/GoogleService-Info-1.plist"; sourceTree = "<group>"; };
+		8A403A7B29CA1B82001BB1B3 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		9DB39466C8D3407C80A38C4F /* Proxima-Nova-Semibold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Proxima-Nova-Semibold.otf"; path = "../assets/fonts/Proxima-Nova-Semibold.otf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -93,7 +95,8 @@
 		13B07FAE1A68108700A75B9A /* AVID */ = {
 			isa = PBXGroup;
 			children = (
-				8A0E81D22967856900FBAC48 /* GoogleService-Info.plist */,
+				8A403A7B29CA1B82001BB1B3 /* GoogleService-Info.plist */,
+				8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -254,7 +257,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8A0E81D42967856900FBAC48 /* GoogleService-Info.plist in Resources */,
+				8A0E81D42967856900FBAC48 /* GoogleService-Info-1.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,7 +267,8 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
-				8A0E81D32967856900FBAC48 /* GoogleService-Info.plist in Resources */,
+				8A403A7C29CA1B82001BB1B3 /* GoogleService-Info.plist in Resources */,
+				8A0E81D32967856900FBAC48 /* GoogleService-Info-1.plist in Resources */,
 				DD97CB19ABE14A6E8AD4C1F0 /* Proxima-Nova-Semibold.otf in Resources */,
 				5524FCB75A654294A3CF9ADB /* Proxima-Nova-Bold.otf in Resources */,
 			);
@@ -485,7 +489,7 @@
 					"-lc++",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.vq.qvid;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vq.avid;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AVID.app/AVID";
 			};
@@ -509,7 +513,7 @@
 					"-lc++",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.vq.qvid;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vq.avid;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AVID.app/AVID";
 			};

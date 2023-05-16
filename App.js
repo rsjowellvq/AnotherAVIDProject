@@ -8,10 +8,14 @@ import React, { useCallback,useRef } from 'react';
 import { Table, TableWrapper, Row, Rows, Col, Cols, Cell } from 'react-native-table-component';
 import auth from '@react-native-firebase/auth';
 import moment from 'moment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
+import BackgroundFetch from "react-native-background-fetch";
+import BackgroundTimer from 'react-native-background-timer';
+import notifee from '@notifee/react-native';
 //import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
-import Buffer from 'buffer';
+import {Buffer} from 'buffer';
 import {
   Alert,
   ActivityIndicator,
@@ -36,8 +40,9 @@ import {
   requireNativeComponent,
   TouchableHighlight,
 } from 'react-native';
-import { acc } from 'react-native-reanimated';
+import { acc, add } from 'react-native-reanimated';
 import { emit } from 'process';
+import { stat } from 'fs';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -56,7 +61,11 @@ const bleManagerEmitter = new NativeEventEmitter(NativeModules.BleManager);
 
 var configArray;
 var lastUsageAddress;
+var lastBackgroundUploadTime;
 var usageArray = [];
+var masterPresetArray = [];
+var backgroundInitiated = false;
+var isBackgroundScan = false;
 var answers = [0,1,2,3,4,5,6,7,8,9,10,'N','Y','NA','S','default'];
 
 
@@ -201,16 +210,230 @@ const styles = StyleSheet.create({
       }
 
   });
+  function changeNumBase(number)
+  {
+    let hexStr = number.toString(16);
+    if(hexStr.length ==1){
+        hexStr = '0'+hexStr;
+    }
+    return hexStr;
+  }
+
+  function generateDateTimeString(year,month,day,hour,minute)
+{
+  var dateString = months[month-1]+" "+day+" 20"+year;
+  var timeString= "";
+  if(hour == 0 || hour == 12)
+  {
+    timeString+="12";
+  }
+  else if(hour > 12)
+  {
+    if(hour % 12 < 10)
+      timeString += "0"+(hour%12).toString();
+    else
+      timeString += (hour%12).toString();
+  }
+  else
+  {
+    timeString += hour.toString();
+  }
+  if(minute < 10)
+    minute = "0"+minute;
+  timeString += ":"+minute+" ";
+  if(hour < 12)
+    timeString += "AM";
+  else
+    timeString += "PM";
+
+  return [dateString,timeString];
+//return months[month]+" "+day+" 20"+year+" "+(hour%13).toString()
+}
+function calculation(add_0,add_1)
+{
+  return parseInt( (changeNumBase(add_1)+ changeNumBase(add_0)) ,16);
+} 
+
+  function convertDateStringForCompare(year,month,day,hour,minute)
+  {
+    var returnString = "";
+    returnString += "20"+year+"-";
+    if(month < 10)
+      returnString += "0"+month+"-";
+    else
+      returnString += month+"-";
+    
+    if(day < 10)
+      returnString += "0"+day+" ";
+    else
+      returnString += day+" ";
+  
+    if(hour<10)
+      returnString += "0"+hour+":";
+    else
+      returnString += hour+":";
+  
+    if(minute<10)
+      returnString += "0"+minute;
+    else
+      returnString += minute;
+  
+    return returnString;
+  
+  }
+
+
+var usageCount = 0;
+var questionCount = 0;
+  
+
+
+  function showNotifiction(titleInput,bodyInput)
+  {
+    notifee.requestPermission().then(()=>{
+
+      notifee.displayNotification({
+        title:titleInput,
+        body:bodyInput
+  
+      });
+
+    });
+    
+  }
+  
+  var foundDevice = false;
+  function discoveredDevice(peripheral)
+  {
+    if(peripheral.name != null && peripheral.advertising.localName == "Avid F001451")
+    {
+      console.log("We found "+peripheral.advertising.localName);
+      foundDevice = true;
+
+
+      BleManager.stopScan().then(()=>{
+
+        console.log("Pigs In A Blanket");
+        newGetDeviceData(peripheral,[0,0]).then(()=>{
+          showNotifiction("Upload Complete!","We uploaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" records to your account!");
+          const now = new Date();
+          AsyncStorage.setItem("Last Upload Time",now.toString());
+        }).catch((error)=>{
+          showNotifiction("Upload Error","There was a problem with your upload. We'll try again later!");
+        });
+        
+        
+        
+
+      });
+      //showNotifiction("Success","We Found Device "+peripheral.name);
+
+
+      //newGetDeviceData(peripheral,[0,0]);
+      
 
 
 
+      
+      
+    }
+  }
 
 
-const App = () => {
 
-    //Start Bluetooth Manager
+  function backgroundScan()
+  {
+     
+      
+  }
+  var taskIdentifier;
+  
+  
+
+  //BackgroundFetch.stop();
+ 
+  
+
+  
+ 
+
+
+function processForegrouondApp()
+{
+  console.log("PRocess HEre!");
+}
+
+
+ const App = () => {
+
+  
+  
+  //Start Bluetooth Manager
     React.useEffect(()=>{BleManager.start();});
+    
+    console.log("Hello");
+
+  
+   
+  
+    //initBackgroundFetch();  
+  
+   
+/*
+var isScanning = false;
+
+function discoveredDevice(peripheral)
+{
+  if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid")
+    console.log("We found "+peripheral.name);
+    BleManager.stopScan();
+}
+
+function lookForDevice()
+{
+  while(new Date().getMinutes() % 10 !=0)
+  {
+
+  }
+}
+   
+function searchForDevices(){
+    
+      if(isScanning || new Date().getMinutes() % 10 !=0)
+      {
+        console.log("The Time Is "+new Date().getMinutes());
+        return;
+      }
+        
+      
+      console.log("Time Is "+new Date().getMinutes());
+      isScanning = true;
+  
+      console.log("Scan Has Begun");
+      bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
+      bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',discoveredDevice);
+
+      BleManager.scan([],4200,false);
+
+}
+    
+
+
+
+BackgroundTimer.runBackgroundTimer(searchForDevices,5000);
+*/
+
+
+
+
+
+
+
+
+
     console.log("boobs");
+
+
     const MainStack = ({route,navigation}) => (
 
     
@@ -295,7 +518,7 @@ const DayUsageScreen = ({route,navigation}) => {
       {
         console.log(responseJson.data[x]);
         var currentObj = [];
-        currentObj.push(responseJson.data[x].DateOfTreatment.substring(0,8));
+        currentObj.push(responseJson.data[x].DateOfTreatment.substring(0,11));
         currentObj.push(responseJson.data[x].TimeOfTreatment);
         if(responseJson.data[x].Type == "U")
         {
@@ -429,8 +652,8 @@ const ForgotPasswordScreen = ({route,navigation}) => {
 
 
   const [forgotPasswordText,setForgotPasswordText] = React.useState("");
-  const [usernameInput,setUsernameInput] = React.useState("");
-  const [isFirebase,setIsFirebase] = React.useState(true);
+  const [emailInput,setEmailInput] = React.useState("");
+  const [buttonPressed,setButtonPressed] = React.useState(false);
   const [submitPressed,setSubmitPressed] = React.useState(false);
   const [passwordStatus,setPasswordStatus] = React.useState("");
   const [passwordEntry,setPasswordEntry] = React.useState("");
@@ -442,15 +665,42 @@ const ForgotPasswordScreen = ({route,navigation}) => {
 
     if(eMailInput == "")
     {
-      setForgotUsernameText("E-mail is blank");
+      Alert.alert("E-mail Error","E-mail field is blank");
       return;
     }
+
+    const requestOptions = {
+      
+      method:'POST',
+      headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+      body: 'action=findEmail&whereJson='+JSON.stringify({"email":eMailInput})+'&appversion='+appVersion
+      //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
   
+  
+    };
+
+    fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+
+    if(responseJson.code == "200")
+    {  
+    console.log(responseJson.code+" "+responseJson.msg);
+      setButtonPressed(true);
+    }
+    else
+      Alert.alert("E-mail Error","E-mail not found");
+    });
+
+
+
+
+    /*
     userAccountPtr.doc(usernameInput).get().then((document)=>
       {
          if(document.exists)
           {
+            console.log("part 1");
             setIsFirebase(true);
+            console.log("part 2");
             auth().sendPasswordResetEmail(document.data().eMail).then(()=>{
               setForgotPasswordText("Please check your e-mail to reset your password");
               return;
@@ -465,7 +715,7 @@ const ForgotPasswordScreen = ({route,navigation}) => {
 
 
       }
-    );
+    );*/
 
 
   
@@ -479,23 +729,32 @@ function processPassword()
 {
   console.log("cheesey");
   
+  
+  if(emailInput == "")
+  {
+    Alert.alert("Error","E-mail is blank");
+    return;
+  }
+  
+  
+  
   if(passwordEntry == "" || confirmEntry == "")
   {
     setPasswordStatus("One field is empty");
     return;
   }
-  
+  console.log("Hello");
   if(passwordEntry != confirmEntry)
   {
     setPasswordStatus("Passwords do not match!");
     return;
   }
-
+  console.log("PArt 55");
   const requestOptions = {
       
     method:'POST',
     headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
-    body: 'action=changepassword&whereJson='+JSON.stringify({"username":usernameInput,"password":passwordEntry})+'&appversion='+appVersion
+    body: 'action=changepassword&whereJson='+JSON.stringify({"email":emailInput,"password":passwordEntry})+'&appversion='+appVersion
     //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
 
 
@@ -505,11 +764,16 @@ function processPassword()
 
     if(responseJson.code == 200)
     {
-      setPasswordStatus("Password Successfully Changed");
+      Alert.alert("Success","Password Successfully Updated.",[{text:"OK",onPress:()=>{navigation.navigate("Login");}}]);
+      //Alert.alert("E-mail Not Verified","Please check your e-mail to verify your account",[{text:'Resend E-mail',onPress:()=>{userCredential.user.sendEmailVerification();}},{text:"OK"}]);
+      console.log("Password Success!");
+      //setPasswordStatus("Password Successfully Changed");
     }
     else
     {
-      setPasswordStatus("User Not Found!");
+      Alert.alert("Error","There was an error resetting your password.");
+      console.log("Password Fail");
+      //setPasswordStatus("User Not Found!");
     }
 
   });
@@ -534,18 +798,31 @@ export function req_ChangePassword(email,password){
 
 
 
-  return(<View style={styles.loginScreen}>
-    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%'}]}>Please enter your username{"\n"}to change your password</Text>
-    <TextInput onChangeText={(text)=>setUsernameInput(text)} value={usernameInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
-    {isFirebase == true && <TouchableOpacity onPress={()=>{resetPassword(usernameInput)}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Submit</Text></TouchableOpacity>}
-    {isFirebase == true && <Text style={{textAlign:'center',fontSize:15}}>{forgotPasswordText}</Text>}
-    {isFirebase == false && <View style={{width:'80%',alignItems:'center'}}><Text>Please enter your new password</Text>
+  return(
+  
+  
+   
+    
+  
+  
+  
+  
+    
+  <KeyboardAwareScrollView style={{backgroundColor:'white'}} contentContainerstyle={{marginTop:'65%',height:'50%',backgroundColor:'white',alignItems:'center'}}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} style={{height:'50%'}}>
+  <View style={styles.loginScreen}>
+    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%',marginTop:'20%'}]}>Please enter your e-mail address{"\n"}to change your password</Text>
+    <TextInput onChangeText={(text)=>setEmailInput(text)} value={emailInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    <TouchableOpacity onPress={()=>{resetPassword(emailInput)}} style={{alignSelf:'center', marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Submit</Text></TouchableOpacity>
+    
+    {buttonPressed == true && <View style={{width:'80%',alignItems:'center'}}><Text>Please enter your new password</Text>
     <TextInput onChangeText={(text)=>setPasswordEntry(text)} value={passwordEntry} style={[styles.textFields,{width:'80%'}]}></TextInput>
     <Text>Confirm your new password</Text>
     <TextInput onChangeText={(text)=>setConfirmEntry(text)} value={confirmEntry} style={[styles.textFields,{width:'80%'}]}></TextInput><Text style={{color:'red'}}>{passwordStatus}</Text><TouchableOpacity onPress={()=>{processPassword()}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Reset Password</Text></TouchableOpacity>
 </View>}
     
-  </View>);
+</View></TouchableWithoutFeedback></KeyboardAwareScrollView>);
+  
 
 };
 
@@ -626,6 +903,9 @@ const LoginScreen = ({route,navigation}) => {
     const [loginProcessStaus,setLoginProcessStatus] = React.useState("");
   console.log("aches");
   var nextLoginScreen = "";
+  
+
+  
 
 
   if(route.params != null && route.params.from == "logout")
@@ -640,7 +920,7 @@ const LoginScreen = ({route,navigation}) => {
 
 
     };
-    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{currentUserData = null;auth().signOut();});
+    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{currentUserData = null;BleManager.disconnect();route.params=null;auth().signOut();});
     
     
   
@@ -689,27 +969,40 @@ const LoginScreen = ({route,navigation}) => {
           fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
 
           console.log("step 222 "+responseJson.code=="200");
+          console.log("Code Is "+responseJson.code+" "+responseJson.msg);
             switch(responseJson.code)
             {
                 //Login Success
                 case 200:
                     console.log("hello world");
                     currentUserData = responseJson.data;
-                    fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
-
-                    userDeviceInfo = responseJson.code == 207 ? "null":responseJson.data;
+                    //AsyncStorage.setItem("currentUserData",currentUserData);
+                    console.log(currentUserData);
                     
-                    /*
-                    if(responseJson.code == 207)
-                    {
-                      userDeviceInfo = "null";
-                    }      
-                    else
-                      userDeviceInfo = responseJson.data;  
-                    */
+                    fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
+                    console.log("Hello Bobby");
+                    userDeviceInfo = responseJson.code == 207 ? "null":responseJson.data;
+                    console.log("User Device Info Is "+userDeviceInfo.lastdatatime);
 
+                    nextLoginScreen = (route.params != null && route.params.from == "logout")?"HOME":"Main";
+                    console.log(nextLoginScreen)
+                    setLoginProcessStatus("Loading Usage Data");
+                    getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                                    
+                      console.log(result);
+                      setIsLoading(false);
+                      setLoginProcessStatus("");
+                      navigation.navigate(nextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+                      //navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
 
                     });
+                  
+                    
+
+
+                    }).catch((error)=>{Alert.alert("Network Error","Please Try Again");return;});
+                    /*
                     console.log(currentUserData.serialnumber);
                     userAccountPtr.doc(usernameInput).get().then((document)=>
                     {
@@ -728,6 +1021,7 @@ const LoginScreen = ({route,navigation}) => {
                                   setLoginProcessStatus("Loading Usage Data"); 
                                   getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
+                                    
                                     console.log(result);
                                     setIsLoading(false);
                                     navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
@@ -805,9 +1099,10 @@ const LoginScreen = ({route,navigation}) => {
                         }
 
                     });
+                    */
                     break;
 
-
+                
                 case 201:
                   //User Deleted
                   Alert.alert("Username Error","This user has been deleted. Please contact VQ OrthoCare for support");
@@ -819,15 +1114,21 @@ const LoginScreen = ({route,navigation}) => {
                 case 202:
 
                 case 203:
-                    Alert.alert("Login Error","Username or Password Incorrect");
+                    Alert.alert("Login Error","Password Incorrect");
                     setIsLoading(false);
                     setLoginProcessStatus("");
-                    setLoginStatus("Username or Password Error Please Try Again (old system)");
+                    //setLoginStatus("Username or Password Error Please Try Again (old system)");
                     break;
+
+                case 205:
+                  Alert.alert("Username Error","Username does not exist");
+                  setIsLoading(false);
+                  setLoginProcessStatus("");
+                  break;
             }
 
 
-          });}
+          }).catch((error)=>{Alert.alert("Network Error","Please Try Again");});}
           console.log("bats");
 
           
@@ -856,8 +1157,8 @@ const LoginScreen = ({route,navigation}) => {
       <TouchableHighlight onPress={()=>{console.log("boobs");setSecureTextOn(!secureTextOn);if(secureTextOn){setEyeIcon(require(eyeOpenIcon));}else{setEyeIcon(require(eyeCloseIcon));}}}><Image style={{flex:0}} source={eyeIcon}/></TouchableHighlight>
       </View>
       <View style={{flexDirection: "row",marginTop: 10, width:'100%',justifyContent:'space-between'}}>
-      <TouchableOpacity onPress={()=>{navigation.navigate("Forgot Username")}}><Text style={styles.grayButton}>Forgot Username?</Text></TouchableOpacity>
-      <TouchableOpacity onPress={()=>{navigation.navigate("Forgot Password")}}><Text style={styles.grayButton}>Forgot Password?</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{setLoginProcessStatus(""); setIsLoading(false);navigation.navigate("Forgot Username")}}><Text style={styles.grayButton}>Forgot Username?</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>{setLoginProcessStatus(""); setIsLoading(false);navigation.navigate("Forgot Password")}}><Text style={styles.grayButton}>Forgot Password?</Text></TouchableOpacity>
       
       </View>
       </View>
@@ -957,7 +1258,7 @@ function getMonthUsageData(month,year){
     monthDays[1]="29";
 
   month < 10 ? month = "0"+month:month=month;
-  console.log("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByMonth&startTime="+year+"-"+month+"-01&endTime="+year+"-"+month+"-"+monthDays[month-1]+"&uid="+currentUserData.uid+"&token="+currentUserData.token);
+  console.log("Console Info: https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByMonth&startTime="+year+"-"+month+"-01&endTime="+year+"-"+month+"-"+monthDays[month-1]+"&uid="+currentUserData.uid+"&token="+currentUserData.token);
   fetch("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByMonth&startTime="+year+"-"+month+"-01&endTime="+year+"-"+month+"-"+monthDays[month-1]+"&uid="+currentUserData.uid+"&token="+currentUserData.token,{method:'GET'}).then((responseData)=>responseData.json()).then((responseJson)=>{
 
   console.log(responseJson.data.length);
@@ -965,20 +1266,23 @@ function getMonthUsageData(month,year){
   {
     console.log("No DAta");
     resolve({});
+    return;
     //resolve("none");
     //navigation.navigate(nextLoginScreen,{calendarInfo:"none"});
   }
 
-  for(var i=0;i<responseJson.data.length;i++)
+  for(var i=0;i<=responseJson.data.length;i++)
   {
+    console.log("Indian Food");
     if(responseJson.data[i].MinOfUseTotal > 0)
     {
       var currentDot = responseJson.data[i].MinOfUseTotal >= 20 ? usageOver20:usageUnder20;
       dataObject[responseJson.data[i]._id]={dots:[currentDot]};
+      console.log("Chinese Food");
       fetch("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByDay&dayTime="+responseJson.data[i]._id+"&uid="+currentUserData.uid+"&token="+currentUserData.token).then((responseaa)=>responseaa.json()).then((responseJsonaa)=>{
 
             var skipped = false;
-      
+            console.log("Chinese Food1");
             for(var j=0;j<responseJsonaa.data.length;j++)
             {
               if(Object.values(responseJsonaa.data[j]).includes("UA"))
@@ -996,12 +1300,14 @@ function getMonthUsageData(month,year){
             {
               dataObject[responseJsonaa.data[0].StandardTimeOfTreatment.substring(0,10)].dots.push(allQuestionsAnswered);
             }
-
+            console.log("Chinese Food2");
             resolve(dataObject);
             //navigation.navigate(nextLoginScreen,{calendarInfo:dataObject});
             //{month:new Date().getMonth()+1,day:new Date().getDate(),year:new Date().getFullYear()}
       });
     }
+    else
+      console.log("Armenian Food");
 
   }
 
@@ -1044,15 +1350,24 @@ const DeviceSelection = ({route,navigation}) => {
   var [deviceList,setDeviceList] = React.useState([]);
   var [foundDevices,setFoundDevices] = React.useState([]); 
   var [isScanning,setIsScanning] = React.useState(false);
+  var [alertShown,setAlertShown] = React.useState(false);
   var [isRegistering,setIsRegistering] = React.useState(false);
   const [firstModalShowing,setFirstModalShowing] = React.useState(true);
   const [isScanningA,setIsScanningA] = React.useState(false);
   navigation.setOptions({headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isScanningA}/>)});
+  if(!alertShown)
+    Alert.alert("Device Selection","Please ensure that your desired AVID device is nearby, powered on, and that Bluetooth mode is active.",[{text:"OK",onPress:()=>{setAlertShown(true)}}]);
+  /*
+
+<Text style={{marginBottom:'5%',fontWeight:'bold',fontSize:20,textAlign:'center'}}>Device Selection</Text>
+    <Text style={{textAlign:'center'}}>Please ensure that your desired AVID device is nearby, powered on, and that Bluetooth mode is active.</Text>
+
+  */
   function createNewUser(deviceID)
   {
     setIsRegistering(true);
     route.params.newUserInfo.serialNumber = deviceID;
-    console.log(route.params.newUserInfo);
+    console.log("User Info Is "+JSON.stringify(route.params.newUserInfo));
     console.log("Point A");
     const newDataRequestOptions = {
   
@@ -1067,6 +1382,7 @@ const DeviceSelection = ({route,navigation}) => {
     };
 
     console.log("Point B");
+    
     fetch("https://avid.vqconnect.io/nodejs/login",newDataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
 
 
@@ -1076,11 +1392,11 @@ const DeviceSelection = ({route,navigation}) => {
     if(responseJson.code == 200)
     {
       console.log("Point D");
-      auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then((userCredential)=>{
+      //auth().createUserWithEmailAndPassword(route.params.newUserInfo.email,route.params.newUserInfo.password).then((userCredential)=>{
 
-        userCredential.user.sendEmailVerification();
+        //userCredential.user.sendEmailVerification();
         
-        userAccountPtr.doc(route.params.newUserInfo.username).set({eMail:route.params.newUserInfo.email});
+        //userAccountPtr.doc(route.params.newUserInfo.username).set({eMail:route.params.newUserInfo.email});
         console.log("Point E");
 
         const loginRequestOptions = {
@@ -1106,7 +1422,7 @@ const DeviceSelection = ({route,navigation}) => {
 
           userDeviceInfo = responseJson.data;  
           setIsRegistering(false);
-          auth().sendEmailVerification();
+          //auth().sendEmailVerification();
           navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
 
 
@@ -1124,12 +1440,13 @@ const DeviceSelection = ({route,navigation}) => {
 
 
 
-      });
+     
     }
 
 
 
     });
+    
     
     
     /*
@@ -1177,8 +1494,14 @@ const DeviceSelection = ({route,navigation}) => {
   }
 
   bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
+  bleManagerEmitter.removeAllListeners('BleManagerStopScan');
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleSelectFoundDevice);
-  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{setIsScanningA(false);});
+  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
+    
+    if(args.status == 10)
+      Alert.alert("Error","We could not detect any nearby devices. Please try again");
+    
+    setIsScanningA(false);});
     
     
   
@@ -1196,6 +1519,7 @@ const DeviceSelection = ({route,navigation}) => {
     </View>
     
   </Modal>
+  {/*
   <Modal animationType='none' visible={firstModalShowing} transparent={true}  >
     <View style={styles.centeredView}>
       <View style={styles.modalView}>
@@ -1205,7 +1529,7 @@ const DeviceSelection = ({route,navigation}) => {
     </View>
     </View>
     
-  </Modal>
+  </Modal>*/}
   <Text style={{marginTop:'6%',alignSelf:'center'}}>* = Device is already registered with another user</Text>
   <Text style={{alignSelf:'center'}}>- = Device has not been properly configured</Text>
   <TouchableOpacity onPress={()=>{BleManager.scan([],20,false);setIsScanningA(true)}} style={{alignSelf:'center',marginTop:'8%',width:'80%',borderWidth:2,backgroundColor:avidPurpleHex,borderColor:avidPurpleHex}}><Text style={{padding:'4%',alignSelf:'center', fontSize:20,fontWeight:'bold',color:'white'}}>Scan For Nearby Devices</Text></TouchableOpacity>
@@ -1226,113 +1550,108 @@ const DeviceSelection = ({route,navigation}) => {
 const MainScreen = ({route,navigation}) => {
 
   console.log(currentUserData);
+  const currentSerialNumber = currentUserData.serialnumber == ''?"No Device Paired":currentUserData.serialnumber;
   console.log("Last Upload Was "+userDeviceInfo);
   const [uploadStatus,setUploadStatus] = React.useState("");
   const initialMarkedDates = {}
   const [datesUpdated,setDatesUpdated] = React.useState(false);
+  const [currentDeviceString,setCurrentDeviceString] = React.useState(currentUserData.serialnumber == ''?"No Device Paired":currentUserData.serialnumber);
   //const [currentSerialNumber,updateSerialNumber] = React.useState(route.props.serialNumber);
   const [markedDates,updateMarkedDates] = React.useState(route.params.calendarInfo);
   const [currentMonth,setCurrentMonth] = React.useState([new Date().getMonth()+1,new Date().getFullYear()]);
   const [isUpdating,setIsUpdating] = React.useState(false);
-  const [scanButtonColor,setScanButtonColor] = React.useState("#fff");
-  const [scanButtonOpacity,setScanButtonOpacity] = React.useState(1.0);
+  
+  const [scanButtonColor,setScanButtonColor] = React.useState(currentUserData.serialnumber == ''?"#bbb":"#fff");
+  const [scanButtonOpacity,setScanButtonOpacity] = React.useState(currentUserData.serialnumber == ''?0.3:1.0);
   const [foundDevice,setFoundDevice] = React.useState(false);
-  const [isScanning,setIsScanning] = React.useState(false);
+  const [isScanning,setIsScanning] = React.useState(currentUserData.serialnumber == '');
   const [scanStatus,setScanStatus] = React.useState("");
   const [lastUploadTime,setLastUploadTime] = React.useState(userDeviceInfo.lastdatatime);
   navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
+  bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
+  bleManagerEmitter.removeAllListeners('BleManagerStopScan');
+  bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleDiscoverDevice);
+  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
+
+    setScanStatus("");
+    if(args.status==10)
+      Alert.alert("Device Not Found","Please ensure that your AVID device is nearby, turned on, and set to Bluetooth mode",[{text:"Try Again",onPress:()=>{BleManager.scan([],10,false);setScanStatus("Scanning for Device");}},{text:"OK",onPress:()=>{setScanStatus("");
+      setIsUpdating(false);
+      setIsScanning(false);
+      setScanButtonColor("white");
+      setScanButtonOpacity(1.0);}}]);
+    
+    //console.log("Scan Stopped "+args.status);
+
+  });
+  /*
+  if(currentUserData.serialNumber != "")
+  {
+    setCurrentDeviceString(currentUserData.serialNumber);
+    setIsScanning(true);
+    setScanButtonColor("#bbb");
+    setScanButtonOpacity(0.3);
+  }
+  else
+  {
+    setCurrentDeviceString("No Device Registered");
+    setIsScanning(false);
+    setScanButtonColor("white");
+    setScanButtonOpacity(1.0);
+  }*/
+    
   
+  async function initBackgroundFetch()
+  {
+    const onEvent = async(taskID) =>{
+      
+      var rightNow = new Date();
+      if(rightNow.getHours() > 0 && rightNow.getHours() < 4)
+
+      {
+        isBackgroundScan = true;
+        bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{if(args.status == 10)showNotifiction("Error","We could not detect your registered device");return;})
+
+        BleManager.scan([],4200,false);
+      }
+      
+      
+      
+      //BackgroundFetch.finish(taskID);
+      
+  
+    }
+  
+    const onTimeout = async (taskID) => {
+      console.warn('[BackgroundFetch] TIMEOUT task: ', taskID);
+      BackgroundFetch.finish(taskID);
+    }
+  
+    let status = await BackgroundFetch.configure({minimumFetchInterval: 15}, onEvent, onTimeout);
+    showNotifiction("Notice","Background Download Ready. Will fire between 12:00-4:00 am");
+    backgroundInitiated = true;
+      
+  }
+  if(!backgroundInitiated)
+    initBackgroundFetch();
+
   //updateMarkedDates(route.params.calendarInfo);
-  
-  
-  function calculation(add_0,add_1)
-  {
-    return parseInt( (changeNumBase(add_1)+ changeNumBase(add_0)) ,16);
-  } 
-
-function changeNumBase(number)
-{
-  let hexStr = number.toString(16);
-  if(hexStr.length ==1){
-      hexStr = '0'+hexStr;
-  }
-  return hexStr;
-}
-
-function generateDateTimeString(year,month,day,hour,minute)
-{
-  var dateString = months[month-1]+" "+day+" 20"+year;
-  var timeString= "";
-  if(hour == 0 || hour == 12)
-  {
-    timeString+="12";
-  }
-  else if(hour > 12)
-  {
-    if(hour % 12 < 10)
-      timeString += "0"+(hour%12).toString();
-    else
-      timeString += (hour%12).toString();
-  }
-  else
-  {
-    timeString += hour.toString();
-  }
-  if(minute < 10)
-    minute = "0"+minute;
-  timeString += ":"+minute+" ";
-  if(hour < 12)
-    timeString += "AM";
-  else
-    timeString += "PM";
-
-  return [dateString,timeString];
-//return months[month]+" "+day+" 20"+year+" "+(hour%13).toString()
-}
-  
-
-function convertDateStringForCompare(year,month,day,hour,minute)
-{
-  var returnString = "";
-  returnString += "20"+year+"-";
-  if(month < 10)
-    returnString += "0"+month+"-";
-  else
-    returnString += month+"-";
-  
-  if(day < 10)
-    returnString += "0"+day+" ";
-  else
-    returnString += day+" ";
-
-  if(hour<10)
-    returnString += "0"+hour+":";
-  else
-    returnString += hour+":";
-
-  if(minute<10)
-    returnString += "0"+minute;
-  else
-    returnString += minute;
-
-  return returnString;
-
-}
-  
+  var tempPreset;
   function newGetDeviceData(peripheral,address)
   {
 
+
     console.log("Address is "+address+" ");
-  BleManager.connect(peripheral.id).then(()=>{
-    setUploadStatus(uploadStatus+'\n'+"Connected to AVID Device. Retrieving Services");
+    BleManager.connect(peripheral.id).then(()=>{
+    //setUploadStatus(uploadStatus+'\n'+"Connected to AVID Device. Retrieving Services");
       BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
-        setUploadStatus(uploadStatus+'\n'+"\nReading Data. Please Wait.");
-          BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{console.log("Wrote Address "+address)});
+        //setUploadStatus(uploadStatus+'\n'+"\nReading Data. Please Wait.");
+          BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{
 
           setTimeout(()=>{
-
+            
               BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
 
                   //Get Config Data
@@ -1340,233 +1659,316 @@ function convertDateStringForCompare(year,month,day,hour,minute)
                   if(address[0] == 0 && address[1]==0)
                   {
                       let complianceTime = parseInt(changeNumBase(readData[3])+changeNumBase(readData[2])+changeNumBase(readData[1])+changeNumBase(readData[0]),16);
-                      var complianceHours;
-                      if(complianceTime/60 < 1)
+                      var complianceHours = complianceTime/60 < 1?0:1;
+                      /*if(complianceTime/60 < 1)
                         complianceHours = 0;
                       else
-                        complianceHours = 1;
+                        complianceHours = 1;*/
                       let comTime = `${complianceHours} hrs ${complianceTime%60} min`;
                       configArray = [comTime,languages[readData[12]],readData[14],Boolean(readData[15]),Boolean(readData[16])];
                       lastUsageAddress = (256*readData[5]+readData[4])-16;
+                      if(lastUsageAddress > 4070)
+                      {
+                        Alert.alert("Notice","No New Records. Device was recently reset.",[{text:'OK',onPress:()=>{
+                          
+                          setScanStatus("");
+                          setIsUpdating(false);
+                          setIsScanning(false);
+                          setScanButtonColor("white");
+                          setScanButtonOpacity(1.0);
+                          return;
+                        
+                        
+                        }}
+                    
+                    
+                      ]);
+                      }
                       console.log("Config Array "+configArray);
                       console.log("Last Usage Data "+lastUsageAddress+" "+[readData[5],readData[4]]);
                       //Start Reading Preset Data
                       if(readData[4] == 0)
+                      {
+                        //AsyncStorage.setItem("lastAddress",[readData[5]-1,0]);
                         newGetDeviceData(peripheral,[readData[5]-1,0]);
+                      }
                       else
+                      {
+                        //AsyncStorage.setItem("lastAddress",[readData[5]-1,0]);
                         newGetDeviceData(peripheral,[readData[5],readData[4]-16]);
-                      //newGetDeviceData(peripheral,[readData[5],readData[4]]);
+                        //newGetDeviceData(peripheral,[readData[5],readData[4]]);
+                      }
+                        
                   }
                   
                   //Get Preset Data
-                  else if(256*address[0]+address[1] < 896)
+                  else if(256*address[0]+address[1] <= 896 && 256*address[0]+address[1] >= 256)
                   {
-                      console.log("Preset Is "+readData)
-                      console.log("Next Preset Address "+[address[0],address[1]+32]);
-                      if(address[1] == 240)
-                        newGetDeviceData(peripheral,[address[0]+1,0]);
-                      else
-                        newGetDeviceData(peripheral,[address[0],address[1]+32]);
-                  }
-                  else
-                  {
-                          
-                    if(readData[0]==93)
-                    {
-                      
-                      if(userDeviceInfo == "null" || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                      //console.log("Preset Is "+readData)
+                      console.log("Next Preset Address "+[address[0],address[1]+16]);
+                      if((256*address[0]+address[1])%32 == 0 && 256*address[0]+address[1] != 896)
                       {
+                        console.log("Preset Is This: "+readData);
+                        var presetArray = [];
+                        if(readData[1]>128)
+                          presetArray.push("Yes");
+                        else
+                          presetArray.push("No");
+
+                        presetArray.push("On");
+                        presetArray.push("N");
+                        if(readData[9]%2==0)
+                          presetArray.push("2");
+                        else
+                          presetArray.push("4");
+
+                          if(readData[9] >= 192)
+                            presetArray.push("6/6");
+                          else if(readData[9] >= 128)
+                            presetArray.push("6|6");
+                          else if(readData[9] >= 64)
+                            presetArray.push("1|1")
+                          else
+                            presetArray.push("Continuous");
+
+                          presetArray.push(readData[18]);
+                          presetArray.push(readData[10]);
+                          presetArray.push(readData[12]);
+                          presetArray.push(readData[13]);
+
+                          console.log(presetArray);
+                          masterPresetArray.unshift(presetArray);
+
+                      }
+                        
+                      
+                      if(address[1] == 0)
+                        newGetDeviceData(peripheral,[address[0]-1,240]);
+                      else
+                        newGetDeviceData(peripheral,[address[0],address[1]-16]);
+                  }
+                  else if(256*address[0]+address[1]>896)
+                  {
+                    console.log("Read Data Is "+readData);
+                    console.log("LAst Time "+userDeviceInfo.lastdatatime);
+                    var newRecords = false;
+                    if(userDeviceInfo == "null" || !userDeviceInfo.hasOwnProperty('lastdatatime') || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                    {
+                      if(readData[0] == 93)
+                      {
+                        usageCount++;
+                        newRecords = true;
                         //console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
                         usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
-                    
+                        //console.log("Array So Far "+usageArray);
                       }
-                      
-                      
-                    }
-                    if(readData[0]==173)
-                    {
-                      if(userDeviceInfo == "null" || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                      if(readData[0] == 173)
                       {
-                        //console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
+                        questionCount++;
+                        newRecords = true;
+                        console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
                         usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
-                      
+                        console.log("Arrayy Soo Fffar "+usageArray);
                       }
-                    }
-                    
-              
-                          if(256*address[0]+address[1]>896)
-                          {
-                            if(address[1] == 0)
-                              {
-                                  newGetDeviceData(peripheral,[address[0]-1,240]);
-                              }
-                              else
-                              {
-                                  newGetDeviceData(peripheral,[address[0],address[1]-16]);
-                              }
-                          }
-                          else
-                          {
-                            //console.log(usageArray); 
-                             uploadDeviceData(usageArray);
-                          }
-                          
+
                       
+                      
+                      
+                     
+                    }
+                    if(address[1] == 0)
+                    {
+                        newGetDeviceData(peripheral,[address[0]-1,240]);
+                    }
+                    else
+                    {
+                        newGetDeviceData(peripheral,[address[0],address[1]-16]);
+                    }
+                  }
+                  else{
+                    
+                    //if(!newRecords)
+                    //  return;
+                 
+                         
+                            //console.log("Final Data Is");
+                            //console.log(usageArray); 
+                           
+                             console.log("Uploading Data To Server!");
+                             console.log("Here we do");
+                             var jsonData = "{";
+                            jsonData += '"SerialNumber":"'+currentUserData.serialnumber+'","UserInfo":{"PatientName":"'+currentUserData.name+'","PatientEmail":"'+currentUserData.email+'","DoctorEmail":"'+currentUserData.doctorEmail+'","DeviceName":"Avid IF2"},';
+                            jsonData += '"Usage":[';
+                            for(var i = 0; i < usageArray.length;i++)
+                            {
+                             if(usageArray[i][0] == "U")
+                             {
+                               console.log("Date Is "+usageArray[i][1][0]);
+                               jsonData += '["'+usageArray[i][0]+'",["'+usageArray[i][1][0]+'","'+usageArray[i][1][1]+'"],'+usageArray[i][2]+','+usageArray[i][4]+','+usageArray[i][3]+','+usageArray[i][5]+','+usageArray[i][6]+','+usageArray[i][7]+','+usageArray[i][8]+','+usageArray[i][9]+']';
+                             }
+                               
+                             else
+                             {
+                               jsonData += '["'+usageArray[i][0]+'",["'+usageArray[i][1][0]+'","'+usageArray[i][1][1]+'"],';
+                               
+                               for(var j = 2;j<8;j++)
+                               {
+                                 if(isNaN(usageArray[i][j]))
+                                   jsonData += '"'+usageArray[i][j]+'"';
+                                 else
+                                   jsonData += usageArray[i][j];
+                                 if(j != 7)
+                                   jsonData+= ",";
+                                 else
+                                   jsonData+= "]";
+                           
+                               }
+                               
+                               //+usageData[i][2]+','+usageData[i][3]+','+usageData[i][4]+','+usageData[i][5]+','+usageData[i][6]+','+usageData[i][7]+']';
+                             }
+                               
+                             if(i != usageArray.length - 1)
+                               jsonData += ",";
+                           
+                            }
+                            jsonData += '],';
+                            jsonData+= '"Config":["'+configArray[0]+'","'+configArray[1]+'","'+configArray[2]+'","'+configArray[3]+'","'+configArray[4]+'"]';
+                            //jsonData += ',"Preset":[[0,0,0,0,0,0,0,0,0]]';
+
+                            jsonData += ',"Preset":[';
+                            
+                            for(var i = 0;i<masterPresetArray.length;i++)
+                            {
+                              jsonData += '["'+masterPresetArray[i][0]+'","'+masterPresetArray[i][1]+'","'+masterPresetArray[i][2]+'","'+masterPresetArray[i][3]+'","'+masterPresetArray[i][4]+'","'+masterPresetArray[i][5]+'","'+masterPresetArray[i][6]+'","'+masterPresetArray[i][7]+'","'+masterPresetArray[i][8]+'"]';
+                              
+                              if(i != masterPresetArray.length - 1)
+                               jsonData += ",";
+                            
+                            }
+                            jsonData+=']';
+
+
+
+
+
+
+
+
+                            jsonData += "}";
+                            console.log(jsonData);
+                           
+                           
+                             /*
+                             token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc0NTAxNzk4LCJleHAiOjE2NzczODE3OTh9.69wZGgeSBXvaPmxXu7URgXhYu_-ZfZjUis1oxu32EYg
+                               action=insertData
+                               dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0,0,0,0,0,0,0],["A",["Oct. 12 2022","06:20 PM"],0,0,0,0,0,0]],"Preset":[[0,0,0,0,0,0,0,0,0]],"Config":[2,2,2,2,2],"UserInfo":{"PatientName":"Russell Jowell","PatientEmail":"russ.jowell@gmail.com","DoctorEmail":"russdoctor@medical.com","DeviceName":"Avid IF2"}}
+                           */
+                             
+                             
+                             
+                               //console.log("Token Is "+currentUserData.token);
+                             
+                             
+                             const dataRequestOptions = {
+                             
+                               method:'POST',
+                               headers: {'x-access-token':currentUserData.token},
+                               body: 'action=insertData&dataJson='+jsonData+'&appversion='+appVersion
+                               //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+                           
+                           
+                             };
+                             
+                             console.log(dataRequestOptions.body);
+                             console.log("Cheese Puffs are GREAT!!");
+                             //fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+                              fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseFromJson)=>  { 
+                                console.log("Error Is "+responseFromJson.code+"  "+responseFromJson.msg);
+                                BleManager.disconnect(peripheral.id);
+                              if(isBackgroundScan)
+                                showNotifiction("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
+                              else
+                                {
+
+                                }
+                              //console.log("Upload Complete. Get it!!");
+                              //console.log("Step One ");
+                              setCurrentMonth([new Date().getMonth(),new Date().getFullYear()]);
+                              //console.log("Step Two A");
+                              updateCalendar([new Date().getMonth(),new Date().getFullYear()]);
+                              //console.log("Step Three");
+                              fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
+                                  if(responseJson.code == 207)
+                                  {
+                                      userDeviceInfo = "null";
+                                  }      
+                                  else
+                                    setLastUploadTime(responseJson.data.lastdatatime);
+                        //updateMarkedDates(responseJson);  
+                              });//End FEtch
+                    
+                              setIsUpdating(false);
+                              setUploadStatus(uploadStatus+"\nUpload Complete!");
+                      Alert.alert("Notice","Upload Complete",[{text:'OK',onPress:()=>{
+                          
+                          setScanStatus("");
+                          setIsUpdating(false);
+                          setIsScanning(false);
+                          setScanButtonColor("white");
+                          setScanButtonOpacity(1.0);
+                        
+                        
+                        }}
+                    
+                    
+                      ]);
+                    console.log("Upload Complete. Hooray!");}).catch((error)=>{console.log("Upload Error "+error);});
+                            return;
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                            
+                          
+                    
                       
                   }
 
 
               });
 
-          },500);
+          },500);});
 
       });
 
   });//End Connect
-}
-
-
-
-function uploadDeviceData(usageData)
-{
+//});
+ }
   
-  setScanStatus("Uploading Data To Server!");
-  console.log("Here we do");
-  var jsonData = "{";
-jsonData += '"SerialNumber":"'+currentUserData.serialnumber+'","UserInfo":{"PatientName":"'+currentUserData.name+'","PatientEmail":"'+currentUserData.email+'","DoctorEmail":"'+currentUserData.doctorEmail+'","DeviceName":"Avid IF2"},';
-jsonData += '"Usage":[';
-for(var i = 0; i < usageData.length;i++)
-{
-  if(usageData[i][0] == "U")
-  {
-    console.log("Date Is "+usageData[i][1][0]);
-    jsonData += '["'+usageData[i][0]+'",["'+usageData[i][1][0]+'","'+usageData[i][1][1]+'"],'+usageData[i][2]+','+usageData[i][4]+','+usageData[i][3]+','+usageData[i][5]+','+usageData[i][6]+','+usageData[i][7]+','+usageData[i][8]+','+usageData[i][9]+']';
-  }
-    
-  else
-  {
-    jsonData += '["'+usageData[i][0]+'",["'+usageData[i][1][0]+'","'+usageData[i][1][1]+'"],';
-    
-    for(var j = 2;j<8;j++)
-    {
-      if(isNaN(usageData[i][j]))
-        jsonData += '"'+usageData[i][j]+'"';
-      else
-        jsonData += usageData[i][j];
-      if(j != 7)
-        jsonData+= ",";
-      else
-        jsonData+= "]";
-
-    }
-    
-    //+usageData[i][2]+','+usageData[i][3]+','+usageData[i][4]+','+usageData[i][5]+','+usageData[i][6]+','+usageData[i][7]+']';
-  }
-    
-  if(i != usageData.length - 1)
-    jsonData += ",";
-
-}
-jsonData += '],';
-jsonData+= '"Config":["'+configArray[0]+'","'+configArray[1]+'","'+configArray[2]+'","'+configArray[3]+'","'+configArray[4]+'"]';
-jsonData += ',"Preset":[[0,0,0,0,0,0,0,0,0]]';
-jsonData += "}";
-console.log(jsonData);
-
-
-  /*
-  token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc0NTAxNzk4LCJleHAiOjE2NzczODE3OTh9.69wZGgeSBXvaPmxXu7URgXhYu_-ZfZjUis1oxu32EYg
-    action=insertData
-    dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0,0,0,0,0,0,0],["A",["Oct. 12 2022","06:20 PM"],0,0,0,0,0,0]],"Preset":[[0,0,0,0,0,0,0,0,0]],"Config":[2,2,2,2,2],"UserInfo":{"PatientName":"Russell Jowell","PatientEmail":"russ.jowell@gmail.com","DoctorEmail":"russdoctor@medical.com","DeviceName":"Avid IF2"}}
-
-  */
-  
-  
-    console.log("Token Is "+currentUserData.token);
-  
-  
-  const dataRequestOptions = {
-  
-    method:'POST',
-    headers: {'x-access-token':currentUserData.token},
-    body: 'action=insertData&dataJson='+jsonData+'&appversion='+appVersion
-    //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
-
-
-  };
-  
-  console.log(dataRequestOptions.body);
-  
-  fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
-
-  setScanStatus("Upload Complete");
-  setCurrentMonth([new Date().getMonth(),new Date().getFullYear()]);
-  updateCalendar([new Date().getMonth(),new Date().getFullYear()]);
-  fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
-
-
-  if(responseJson.code == 207)
-  {
-    userDeviceInfo = "null";
-  }      
-  else
-    setLastUploadTime(responseJson.data.lastdatatime);
-    //updateMarkedDates(responseJson);  
-  
-
-
-  });
-  setIsUpdating(false);
-  setUploadStatus(uploadStatus+"\nUpload Complete!");
-  Alert.alert("Upload Complete!","Thank You!",[
-
-    {text:'Yes',onPress:()=>{
-      
-      setScanStatus("");
-      setIsUpdating(false);
-      setIsScanning(false);
-      setScanButtonColor("white");
-      setScanButtonOpacity(1.0);
-    
-    
-    }}
-
-
-  ]);
-  
-  console.log("Response Is "+responseJson.code+" "+responseJson.msg);
-
-  }).catch((error,data)=>{console.log("The Error "+error+" "+data)});
-  
-} 
-
-  const handleDiscoverDevice = (peripheral) => {
+  function handleDiscoverDevice(peripheral){
 
     //console.log("Device Is "+peripheral.advertising.localName.substring(0,11));
     if(peripheral.name != null && peripheral.advertising.localName == "Avid "+currentUserData.serialnumber)
     {
-      BleManager.stopScan().then(()=>{
+      BleManager.stopScan();
 
-        setScanStatus("Reading Data from Device");
+        console.log("Reading Data from Device - Please Wait");
         newGetDeviceData(peripheral,[0,0]);
+        
+       
 
 
-      });
+     
     }
 
   }
 
-  bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
-  bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleDiscoverDevice);
-  bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
-
-    setScanStatus("");
-    if(args.status==10)
-      Alert.alert("Device Not Found","Please ensure that your AVID device is nearby, turned on, and set to Bluetooth mode");
-    
-    //console.log("Scan Stopped "+args.status);
-
-  });
+  
 
 
   function updateCalendar(dayInfo)
@@ -1584,6 +1986,9 @@ console.log(jsonData);
 
   const startDeviceScanButton = () => {
 
+    
+    
+    
     setIsUpdating(true);
     setIsScanning(true);
     setScanButtonColor("#bbb");
@@ -1591,6 +1996,8 @@ console.log(jsonData);
     setScanStatus("Scanning for Device");
     
     BleManager.scan([],20,false);
+
+  
 
 //#fad7ed
 
@@ -1608,8 +2015,8 @@ return(
 </View>
 <Calendar markedDates={markedDates}  onDayPress={day=>{console.log("The Day Is "+day.dateString);if(day.dateString in markedDates){navigation.navigate("USAGE SUBSTACK",{currentDate:day.dateString,from:"calendar"});}  }} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);updateCalendar([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:28,marginTop:'8%'}]}>Your Current Device:</Text>
-<Text style={[styles.grayButton,{alignSelf:'center',fontSize:23}]}>{currentUserData.serialnumber}</Text>
-<TouchableOpacity   disabled={isScanning} alignSelf='center' onPress={()=>{startDeviceScanButton();}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
+<Text style={[styles.grayButton,{alignSelf:'center',fontSize:23}]}>{currentDeviceString}</Text>
+<TouchableOpacity disabled={isScanning} alignSelf='center' onPress={()=>{Alert.alert("Prepare To Connect","Please ensure your paired AVID device is turned on and Bluetooth mode is activated",[{text:"OK",onPress:()=>{isBackgroundScan=false;startDeviceScanButton();}}]);}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
 <Text style={{fontSize:17,color:'grey',alignSelf:'center'}}>{scanStatus}</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23,marginTop:'8%'}]}>Last Upload Time:</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:18}]}>{moment(lastUploadTime,'YYYY-MM-DD').format('MMM DD, YYYY')}</Text>
@@ -1715,23 +2122,13 @@ const SignupScreen = ({navigation}) => {
     console.log("Validate");
     setTimeout(()=>{
 
-      var requestOptions;
+      //var requestOptions;
       var insertString = type == "user" ? "checkUsername&username="+value:"checkEmail&email="+value;
       
         
         
-        requestOptions = {
-      
-          method:'POST',
-          headers: new Headers({
-            'Content-Type': 'application/x-www-form-urlencoded', // <-- Specifying the Content-Type
-          }),
-          body: 'action='+insertString+'&appversion='+appVersion
+       var requestOptions = {method:'POST',headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded', /* <-- Specifying the Content-Type*/}),body: 'action='+insertString+'&appversion='+appVersion};
           //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
-    
-    
-        };
-
       fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((res)=>res.json()).then((resjson)=>{
 
         

@@ -94,6 +94,16 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>RNBackgroundFetch.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RNCAsyncStorage.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>RNCMaskedView.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -115,6 +125,11 @@
 			<false/>
 		</dict>
 		<key>RNGestureHandler.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RNNotifee.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -159,6 +174,11 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>React-RCTAppDelegate.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>React-RCTBlob.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -190,11 +210,6 @@
 			<false/>
 		</dict>
 		<key>React-RCTVibration.xcscheme</key>
-		<dict>
-			<key>isShown</key>
-			<false/>
-		</dict>
-		<key>React-bridging.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -310,6 +325,11 @@
 			<false/>
 		</dict>
 		<key>nanopb.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>react-native-background-timer.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>

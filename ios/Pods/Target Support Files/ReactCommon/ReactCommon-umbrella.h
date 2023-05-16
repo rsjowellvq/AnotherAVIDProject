@@ -10,7 +10,21 @@
 #endif
 #endif
 
+#import "Array.h"
+#import "AString.h"
+#import "Base.h"
+#import "Bool.h"
+#import "Bridging.h"
+#import "CallbackWrapper.h"
+#import "Class.h"
+#import "Convert.h"
+#import "Error.h"
+#import "Function.h"
 #import "LongLivedObject.h"
+#import "Number.h"
+#import "Object.h"
+#import "Promise.h"
+#import "Value.h"
 #import "TurboCxxModule.h"
 #import "TurboModule.h"
 #import "TurboModuleBinding.h"

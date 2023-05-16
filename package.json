@@ -10,6 +10,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@notifee/react-native": "^7.7.1",
+    "@react-native-async-storage/async-storage": "^1.18.1",
     "@react-native-firebase/app": "^16.5.0",
     "@react-native-firebase/auth": "^16.5.0",
     "@react-native-firebase/firestore": "^16.5.0",
@@ -18,8 +20,10 @@
     "@react-navigation/native": "^6.1.1",
     "@react-navigation/stack": "^6.3.14",
     "moment": "^2.29.4",
-    "react": "18.1.0",
-    "react-native": "0.70.6",
+    "react": "18.2.0",
+    "react-native": "0.71.7",
+    "react-native-background-fetch": "^4.1.9",
+    "react-native-background-timer": "^2.4.1",
     "react-native-ble-manager": "^8.5.0",
     "react-native-calendars": "^1.1293.0",
     "react-native-gesture-handler": "^2.8.0",

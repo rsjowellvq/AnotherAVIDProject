@@ -7,6 +7,7 @@ install! 'cocoapods', :deterministic_uuids => false
 
 target 'AVID' do
   config = use_native_modules!
+  pod 'react-native-background-timer', :path => '../node_modules/react-native-background-timer'
 
   # Flags change depending on the env values.
   flags = get_default_flags()

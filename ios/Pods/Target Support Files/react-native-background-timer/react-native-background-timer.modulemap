@@ -1,0 +1,6 @@
+framework module react_native_background_timer {
+  umbrella header "react-native-background-timer-umbrella.h"
+
+  export *
+  module * { export * }
+}

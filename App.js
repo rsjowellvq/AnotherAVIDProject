@@ -1,10 +1,11 @@
 import 'react-native-gesture-handler';
-import { NavigationContainer, StackActions } from '@react-navigation/native';
-import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigation/drawer';
+import { NavigationContainer, StackActions, CommonActions } from '@react-navigation/native';
+
+import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import {Calendar, CalendarList, Agenda} from 'react-native-calendars';
 import { createStackNavigator, HeaderBackButton } from '@react-navigation/stack';
 import BleManager, { read, setName,checkState } from 'react-native-ble-manager';
-import React, { useCallback,useRef } from 'react';
+import React, { useCallback,useEffect,useRef } from 'react';
 import { Table, TableWrapper, Row, Rows, Col, Cols, Cell } from 'react-native-table-component';
 import auth from '@react-native-firebase/auth';
 import moment from 'moment';
@@ -60,12 +61,12 @@ const avidPurpleHex = '#722053';
 const bleManagerEmitter = new NativeEventEmitter(NativeModules.BleManager);
 
 var configArray;
-var lastUsageAddress;
+//var lastUsageAddress;
 var lastBackgroundUploadTime;
 var usageArray = [];
 var masterPresetArray = [];
-var backgroundInitiated = false;
-var isBackgroundScan = false;
+//var backgroundInitiated = false;
+//var isBackgroundScan = false;
 var answers = [0,1,2,3,4,5,6,7,8,9,10,'N','Y','NA','S','default'];
 
 
@@ -285,6 +286,7 @@ function calculation(add_0,add_1)
 
 var usageCount = 0;
 var questionCount = 0;
+var lastUsageAddress;
   
 
 
@@ -314,7 +316,7 @@ var questionCount = 0;
       BleManager.stopScan().then(()=>{
 
         console.log("Pigs In A Blanket");
-        newGetDeviceData(peripheral,[0,0]).then(()=>{
+        getDeviceData(peripheral,[0,0]).then(()=>{
           showNotifiction("Upload Complete!","We uploaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" records to your account!");
           const now = new Date();
           AsyncStorage.setItem("Last Upload Time",now.toString());
@@ -329,7 +331,7 @@ var questionCount = 0;
       //showNotifiction("Success","We Found Device "+peripheral.name);
 
 
-      //newGetDeviceData(peripheral,[0,0]);
+      //getDeviceData(peripheral,[0,0]);
       
 
 
@@ -341,28 +343,19 @@ var questionCount = 0;
 
 
 
-  function backgroundScan()
-  {
-     
-      
-  }
-  var taskIdentifier;
-  
-  
 
-  //BackgroundFetch.stop();
  
   
 
   
  
 
-
+/*
 function processForegrouondApp()
 {
   console.log("PRocess HEre!");
 }
-
+*/
 
  const App = () => {
 
@@ -424,7 +417,14 @@ BackgroundTimer.runBackgroundTimer(searchForDevices,5000);
 */
 
 
+React.useEffect(()=>{
+  showNotifiction("Hello","We're Here");
+  return ()=>{
+    console.log("It was closed");
+    showNotifiction("Notice","AVID App was closed. BG download cancelled");
+  }
 
+},[]);
 
 
 
@@ -439,16 +439,63 @@ BackgroundTimer.runBackgroundTimer(searchForDevices,5000);
     
         <Drawer.Navigator initialRouteName='HOME' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: avidPurpleHex}}}>
         
-        <Drawer.Screen name="HOME" component={MainScreen} initialParams={{calendarInfo:route.params.calendarInfo,serialNumber:route.params.serialNumber}}/>
+        <Drawer.Screen name="HOME" component={MainScreen} initialParams={{calendarInfo:route.params.calendarInfo,serialNumber:route.params.serialNumber,from:route.params.from}}/>
         <Drawer.Screen name="USAGE SUBSTACK" component={UsageHistoryStack} options={{drawerItemStyle:{display:"none"},unmountOnBlur:true,headerShown:false}}/>
         
-        <Drawer.Screen name="LOGOUT" component={LoginScreen} options={{headerShown:false}} initialParams={{from:"logout"}}/>
+       {/*} <Drawer.Screen name="LOGOUT" component={LoginScreen} options={{headerShown:false}} initialParams={{from:"logout",nextScreen:"HOME"}}/>*/}
+        <Drawer.Screen name ="LOGOUT" component={LogoutStack}/>
         
   
       </Drawer.Navigator>
     
        );
 
+      const LogoutStack = ({route,navigation}) => {
+
+        
+        navigation.dispatch(
+
+          CommonActions.reset({
+            index:0,
+            routes:[{name:"Login"}]
+          })
+    
+        );
+        //nextLoginScreen = "HOME";
+        console.log("Logout PRocess");
+        const logoutRequestOptions = {
+          
+          method:'POST',
+          headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+          body: 'action=signOut&+uid='+currentUserData.uid+"&appversion="+appVersion
+          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+    
+    
+        };
+        console.log("step 1");
+        fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json())
+        .then((responseJson)=>{
+          currentUserData = null;
+          console.log("step 122");
+          BleManager.getConnectedPeripherals([]).then((peripheralArray)=>{
+            if(peripheralArray.length != 0)
+              BleManager.disconnect();
+          }).catch(error=>{console.log(error)});
+          console.log("step 33");
+          //route.params=null;
+          if(auth().currentUser)
+            auth().signOut();
+          console.log("Step 444 ");
+          //setNextNavScreen("HOME");
+          //route.params.nextScreen = "HOME";
+          
+          
+          
+        }).catch((error)=>{console.log(error)});
+        
+        //return(<DrawerItem label="LoGoUt" onPress={()=>{console.log("Button Was Pressed!!")}} />);
+
+      }
 
        const UsageHistoryStack = ({route,navigation}) => {
 
@@ -659,6 +706,7 @@ const ForgotPasswordScreen = ({route,navigation}) => {
   const [passwordEntry,setPasswordEntry] = React.useState("");
   const [confirmEntry,setConfirmEntry] = React.useState("");
   const currentUsername = "";
+  const confirmPassRef = useRef();
   
   function resetPassword(eMailInput)
   {
@@ -668,27 +716,66 @@ const ForgotPasswordScreen = ({route,navigation}) => {
       Alert.alert("E-mail Error","E-mail field is blank");
       return;
     }
+    console.log("Testing "+eMailInput);
+    auth().signInWithEmailAndPassword(eMailInput,"tespw").then((result)=>{console.log("success!!");}).catch((error)=>{
 
-    const requestOptions = {
+      console.log(error.code);
+
+      if(error.code == "auth/invalid-email")
+      {
+        Alert.alert("Error","Invalid E-mail format");
+      }
+
+
+      if(error.code == "auth/wrong-password")
+      {
+        auth().sendPasswordResetEmail(eMailInput).then((data)=>{
+
+          Alert.alert("Notice","Please check your e-mail to reset your password.",[{text:"OK",onPress:()=>{navigation.navigate("Login");}}]);
+
+        }).catch((error)=>{
+
+          Alert.alert("Error","Firebase Error");
+
+        })
+        console.log("User In Firebase");
+      }
+
+      if(error.code == "auth/user-not-found")
+      {
+        const requestOptions = {
       
-      method:'POST',
-      headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
-      body: 'action=findEmail&whereJson='+JSON.stringify({"email":eMailInput})+'&appversion='+appVersion
-      //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
-  
-  
-    };
+          method:'POST',
+          headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+          body: 'action=findEmail&whereJson='+JSON.stringify({"email":eMailInput})+'&appversion='+appVersion
+          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+      
+        };
 
-    fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+        fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
 
-    if(responseJson.code == "200")
-    {  
-    console.log(responseJson.code+" "+responseJson.msg);
-      setButtonPressed(true);
-    }
-    else
-      Alert.alert("E-mail Error","E-mail not found");
+        if(responseJson.code == "200")
+          setButtonPressed(true);
+        else
+          Alert.alert("E-mail Error","E-mail not found");
+    }).catch((error)=>{
+
+                if(error.name == "SyntaxError")
+                {
+        
+                  Alert.alert("Network Error","Please Try Again");
+                  return;
+                }
+
     });
+      }
+
+
+    });
+
+    
+
+    
 
 
 
@@ -740,13 +827,14 @@ function processPassword()
   
   if(passwordEntry == "" || confirmEntry == "")
   {
-    setPasswordStatus("One field is empty");
+    Alert.alert("Error","One field is empty");
     return;
   }
   console.log("Hello");
   if(passwordEntry != confirmEntry)
   {
-    setPasswordStatus("Passwords do not match!");
+    Alert.alert("Error","Passwords do not match");
+    //setPasswordStatus("Passwords do not match!");
     return;
   }
   console.log("PArt 55");
@@ -808,17 +896,17 @@ export function req_ChangePassword(email,password){
   
   
     
-  <KeyboardAwareScrollView style={{backgroundColor:'white'}} contentContainerstyle={{marginTop:'65%',height:'50%',backgroundColor:'white',alignItems:'center'}}>
+  <KeyboardAwareScrollView style={{backgroundColor:'white'}} contentContainerStyle={{backgroundColor:'white'}}>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} style={{height:'50%'}}>
   <View style={styles.loginScreen}>
-    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%',marginTop:'20%'}]}>Please enter your e-mail address{"\n"}to change your password</Text>
-    <TextInput onChangeText={(text)=>setEmailInput(text)} value={emailInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    <Text style={[styles.loginLabels,{textAlign:'center',marginBottom:'15%',marginTop:'10%'}]}>Please enter your e-mail address{"\n"}to change your password</Text>
+    <TextInput returnKeyType='go' onSubmitEditing={()=>{resetPassword(emailInput)}} onChangeText={(text)=>setEmailInput(text)} value={emailInput} style={[styles.textFields,{width:'80%'}]}></TextInput>
     <TouchableOpacity onPress={()=>{resetPassword(emailInput)}} style={{alignSelf:'center', marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Submit</Text></TouchableOpacity>
     
-    {buttonPressed == true && <View style={{width:'80%',alignItems:'center'}}><Text>Please enter your new password</Text>
-    <TextInput onChangeText={(text)=>setPasswordEntry(text)} value={passwordEntry} style={[styles.textFields,{width:'80%'}]}></TextInput>
+    {buttonPressed == true && <View style={{width:'100%',alignItems:'center'}}><Text>Please enter your new password</Text>
+    <TextInput returnKeyType='next' onSubmitEditing={()=>{confirmPassRef.current.focus();}} onChangeText={(text)=>setPasswordEntry(text)} value={passwordEntry} style={[styles.textFields,{width:'80%'}]}></TextInput>
     <Text>Confirm your new password</Text>
-    <TextInput onChangeText={(text)=>setConfirmEntry(text)} value={confirmEntry} style={[styles.textFields,{width:'80%'}]}></TextInput><Text style={{color:'red'}}>{passwordStatus}</Text><TouchableOpacity onPress={()=>{processPassword()}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Reset Password</Text></TouchableOpacity>
+    <TextInput ref={confirmPassRef} onSubmitEditing={()=>{processPassword()}} returnKeyType='done' onChangeText={(text)=>setConfirmEntry(text)} value={confirmEntry} style={[styles.textFields,{width:'80%'}]} autoCorrect={false} spellCheck={false}></TextInput><Text style={{color:'red'}}>{passwordStatus}</Text><TouchableOpacity onPress={()=>{processPassword()}} style={{ marginTop:30,marginBottom:50, backgroundColor: '#722053', width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color: '#fff', textAlign: 'center', fontSize: 25, margin:10, }}>Reset Password</Text></TouchableOpacity>
 </View>}
     
 </View></TouchableWithoutFeedback></KeyboardAwareScrollView>);
@@ -901,16 +989,30 @@ const LoginScreen = ({route,navigation}) => {
     const [isLoading,setIsLoading] = React.useState(false);
     const [userInfo,setUserInfo] = React.useState();
     const [loginProcessStaus,setLoginProcessStatus] = React.useState("");
-  console.log("aches");
+    const [nextNavScreen,setNextNavScreen] = React.useState("");
+  console.log("aches ");
+
+  if(route.params != null)
+    console.log(route.params.from);
+
   var nextLoginScreen = "";
   
 
   
 
-
-  if(route.params != null && route.params.from == "logout")
+  /*
+  if(route.params != null && route.params.from == "logout" && currentUserData != null)
   {
-    
+    navigation.dispatch(
+
+      CommonActions.reset({
+        index:0,
+        routes:[{name:"Login"}]
+      })
+
+    );
+    //nextLoginScreen = "HOME";
+    console.log("Logout PRocess");
     const logoutRequestOptions = {
       
       method:'POST',
@@ -920,12 +1022,244 @@ const LoginScreen = ({route,navigation}) => {
 
 
     };
-    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json()).then((responseJson)=>{currentUserData = null;BleManager.disconnect();route.params=null;auth().signOut();});
+    console.log("step 1");
+    fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json())
+    .then((responseJson)=>{
+      currentUserData = null;
+      console.log("step 122");
+      BleManager.getConnectedPeripherals([]).then((peripheralArray)=>{
+        if(peripheralArray.length != 0)
+          BleManager.disconnect();
+      }).catch(error=>{console.log(error)});
+      console.log("step 33");
+      //route.params=null;
+      if(auth().currentUser)
+        auth().signOut();
+      console.log("Step 444 "+route.params.nextScreen);
+      //setNextNavScreen("HOME");
+      //route.params.nextScreen = "HOME";
+      
+      
+      
+    }).catch((error)=>{console.log(error)});
     
     
   
   }
-   
+  else
+    //route.params.nextScreen = "Main";
+  */
+  console.log("Next SCreen Is "+nextLoginScreen);
+
+    function finishLogin(usernameIn,passwordIn,requestOptions)
+    {
+      
+      
+      function retrieveData()
+      {
+        setLoginProcessStatus("Fetching Usage Data");
+        fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json())
+        .then((responseJson)=>{
+          
+          userDeviceInfo = responseJson.data.status == 2 ? responseJson.data:"null";
+      
+          if(userDeviceInfo == "null" || userDeviceInfo.lastuserdata == null)
+          {
+            console.log("No Device Connected");
+            console.log("Still here??123 "+auth().currentUser.emailVerified);
+            navigation.navigate("Main",{calendarInfo:{},serialNumber:currentUserData.serialnumber,from:"login"});
+          } 
+          else
+          {
+            console.log("Device SN "+currentUserData.serialnumber);
+              
+          getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                              
+            console.log(result);
+            setIsLoading(false);
+            setLoginProcessStatus("");
+            console.log("Still here?? "+auth().currentUser.emailVerified);
+            navigation.navigate("Main",{calendarInfo:result,serialNumber:currentUserData.serialnumber,from:"login"});
+            //navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+          }).catch((error)=>{
+            console.log("There Was Problem "+error);
+            auth().signOut().then(()=>{
+
+              Alert.alert("Network Error","Please Try Again");
+
+            })
+
+          });
+          }
+
+          /*
+          getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
+
+                              
+            console.log(result);
+            setIsLoading(false);
+            setLoginProcessStatus("");
+            //navigation.navigate(nextLoginScreen,{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+            //navigation.navigate("HOME",{calendarInfo:result,serialNumber:currentUserData.serialnumber});
+
+          });*/
+        
+        })
+        .catch((error)=>{  
+          if(error.name == "SyntaxError")
+          {
+            console.log("Georgeio");
+            if(auth().currentUser)
+              auth().signOut();
+            //console.log(auth().currentUser);
+            setIsLoading(false);
+            setLoginProcessStatus("");
+            Alert.alert("Network Error","Please Try Again");
+            return;
+          }
+
+    
+      
+      
+    });
+      }
+      
+      
+      //console.log(requestOptions);
+      fetch('https://avid.vqconnect.io/nodejs/login',requestOptions).then((response)=>response.json()).then((responseJson)=>{
+      
+        switch(responseJson.code)
+        {
+          case 200:
+            currentUserData = responseJson.data;  
+            if(!auth().currentUser)
+              auth().createUserWithEmailAndPassword(responseJson.data.email.toLowerCase(),passwordIn).then((userCredential)=>{
+                userAccountPtr.doc(usernameIn.toLowerCase()).set({eMail:responseJson.data.email.toLowerCase(),md5pass:responseJson.data.PassHash});
+                auth().currentUser.sendEmailVerification().then(()=>{console.log("E-mail success");retrieveData();})
+                //return;
+              }).catch((error)=>{console.log("Erris is "+error)});
+            else
+              retrieveData();
+            break;
+          case 201:
+              //User Deleted
+            setIsLoading(false);
+            setLoginProcessStatus("");
+            Alert.alert("Username Error","This user has been deleted. Please contact VQ OrthoCare for support");
+            break;
+            
+            
+          case 202:
+
+          case 203:
+            setIsLoading(false);
+            setLoginProcessStatus("");      
+            Alert.alert("Login Error","Password Incorrect");
+                
+                //setLoginStatus("Username or Password Error Please Try Again (old system)");
+            break;
+
+          case 205:
+            setIsLoading(false);
+            setLoginProcessStatus("");    
+            Alert.alert("Username Error","Username does not exist");
+            break;
+        }
+      
+      
+      //console.log(auth().currentUser);
+       
+      
+      console.log(responseJson.data);
+
+        }).catch((error)=>{
+
+          console.log(error);
+          if(error.name == "SyntaxError")
+          {
+            console.log("Georgeio");
+            if(auth().currentUser)
+              auth().signOut();
+            console.log(auth().currentUser);
+            setIsLoading(false);
+            setLoginProcessStatus("");
+            Alert.alert("Network Error","Please Try Again");
+
+
+          
+            
+            
+          }
+
+        });
+    }
+
+    async function processLogin(usernameIn,passwordIn)
+    {
+      if(auth().currentUser)
+      {
+        console.log("Chinese Egg Rolls");
+        await auth().signOut();
+        console.log("Stuff");
+        console.log(auth().currentUser);
+      }
+        
+      var requestOptions;
+      
+      
+      userAccountPtr.doc(usernameIn.toLowerCase()).get().then((document)=>
+                    {
+                      if(document.exists)
+                      {
+                        console.log("exists");
+                        auth().signInWithEmailAndPassword(document.data().eMail,passwordIn).then((userCredential)=>{
+
+                          requestOptions = {
+      
+                            method:'POST',
+                            headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+                            body: 'action=signIn&whereJson='+JSON.stringify({"username":usernameIn,"md5password":document.data().md5pass,"password":"NULL"})+'&appversion='+appVersion
+                            //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+                      
+                      
+                          };
+                          finishLogin(usernameIn,passwordIn,requestOptions);
+
+                        }).catch(error=>{
+                              console.log(error.code);
+                                setLoginProcessStatus(""); 
+                                if(error.code == "auth/wrong-password")
+                                {
+                                  setIsLoading(false);
+                                  Alert.alert("Login Error","Password Incorrect");
+                                  return;
+                                }
+
+
+                        });
+                      }
+                      //If user does not exist in Firebase yet.
+                      else
+                      {
+                        console.log("Doesnt exist");
+                        requestOptions = {
+      
+                          method:'POST',
+                          headers: new Headers({'Content-Type': 'application/x-www-form-urlencoded'}),
+                          body: 'action=signIn&whereJson='+JSON.stringify({"username":usernameIn,"password":passwordIn})+'&appversion='+appVersion
+                          //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+                    
+                    
+                        };
+                        finishLogin(usernameIn,passwordIn,requestOptions);
+                      }
+                    
+
+
+                    });
+    }
 
     function checkFieldInputs(usernameInput,passwordInput)
     {
@@ -940,9 +1274,15 @@ const LoginScreen = ({route,navigation}) => {
           setLoginProcessStatus(""); 
           setIsLoading(false);
           if(password == "")
+          {
             Alert.alert("Input Error","Username & Password are blank");
+            return;
+          }
           else
+          {
             Alert.alert("Input Error","Username is blank");
+            return;
+          }
           
         }
         else if(password == "")
@@ -953,8 +1293,11 @@ const LoginScreen = ({route,navigation}) => {
         }
         else
         {
-        //Begin Process Login
         
+          processLogin(username,password);
+        
+          //Begin Process Login
+        /*
         const requestOptions = {
       
             method:'POST',
@@ -1002,7 +1345,7 @@ const LoginScreen = ({route,navigation}) => {
 
 
                     }).catch((error)=>{Alert.alert("Network Error","Please Try Again");return;});
-                    /*
+                    
                     console.log(currentUserData.serialnumber);
                     userAccountPtr.doc(usernameInput).get().then((document)=>
                     {
@@ -1099,7 +1442,7 @@ const LoginScreen = ({route,navigation}) => {
                         }
 
                     });
-                    */
+                    
                     break;
 
                 
@@ -1128,7 +1471,7 @@ const LoginScreen = ({route,navigation}) => {
             }
 
 
-          }).catch((error)=>{Alert.alert("Network Error","Please Try Again");});}
+          }).catch((error)=>{Alert.alert("Network Error","Please Try Again");});*/}
           console.log("bats");
 
           
@@ -1282,7 +1625,7 @@ function getMonthUsageData(month,year){
       fetch("https://avid.vqconnect.io/nodejs/userList?action=findUserUsageDataByDay&dayTime="+responseJson.data[i]._id+"&uid="+currentUserData.uid+"&token="+currentUserData.token).then((responseaa)=>responseaa.json()).then((responseJsonaa)=>{
 
             var skipped = false;
-            console.log("Chinese Food1");
+            console.log("Chinese Food1 "+responseJsonaa);
             for(var j=0;j<responseJsonaa.data.length;j++)
             {
               if(Object.values(responseJsonaa.data[j]).includes("UA"))
@@ -1304,6 +1647,14 @@ function getMonthUsageData(month,year){
             resolve(dataObject);
             //navigation.navigate(nextLoginScreen,{calendarInfo:dataObject});
             //{month:new Date().getMonth()+1,day:new Date().getDate(),year:new Date().getFullYear()}
+      }).catch((error)=>{
+        console.log(error.name+" "+error);
+        if(error.name == "SyntaxError")
+        {
+          reject("Network Error");
+        }
+    
+    
       });
     }
     else
@@ -1314,6 +1665,14 @@ function getMonthUsageData(month,year){
   //console.log(dataObject);
 
   
+
+  }).catch((error)=>{
+
+    if(error.name == "SyntaxError")
+    {
+      reject("Network Error");
+    }
+
 
   }); //End Fetch
 
@@ -1560,7 +1919,13 @@ const MainScreen = ({route,navigation}) => {
   const [markedDates,updateMarkedDates] = React.useState(route.params.calendarInfo);
   const [currentMonth,setCurrentMonth] = React.useState([new Date().getMonth()+1,new Date().getFullYear()]);
   const [isUpdating,setIsUpdating] = React.useState(false);
-  
+  const [verifyShown,setVerifyShown] = React.useState(false);
+  const [lastDataAddress,setLastDataAddress] = React.useState(null);
+  const [backgroundInitiated,setBackgroundInitiated] = React.useState(false);
+  const [isBackground,setIsBackground] = React.useState(true);
+  //const [lastUsageAddress,setLastUsageAddress] = React.useState(0);
+  //const [usageCount,setUsageCount] = React.useState(0);
+  //const [questionCount,setQuestionCount] = React.useState(0);
   const [scanButtonColor,setScanButtonColor] = React.useState(currentUserData.serialnumber == ''?"#bbb":"#fff");
   const [scanButtonOpacity,setScanButtonOpacity] = React.useState(currentUserData.serialnumber == ''?0.3:1.0);
   const [foundDevice,setFoundDevice] = React.useState(false);
@@ -1570,22 +1935,57 @@ const MainScreen = ({route,navigation}) => {
   navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
+
+ 
+
+
+
   bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
   bleManagerEmitter.removeAllListeners('BleManagerStopScan');
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleDiscoverDevice);
   bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
 
     setScanStatus("");
+    showNotifiction("Notice","Background Scan Halted.");
+    console.log("The Args "+args);
     if(args.status==10)
-      Alert.alert("Device Not Found","Please ensure that your AVID device is nearby, turned on, and set to Bluetooth mode",[{text:"Try Again",onPress:()=>{BleManager.scan([],10,false);setScanStatus("Scanning for Device");}},{text:"OK",onPress:()=>{setScanStatus("");
-      setIsUpdating(false);
-      setIsScanning(false);
-      setScanButtonColor("white");
-      setScanButtonOpacity(1.0);}}]);
+    {
+      if(isBackground)
+      {
+        showNotifiction("Error","We could not detect your device!");
+      }
+      else
+      {
+        Alert.alert("Device Not Found","Please ensure that your AVID device is nearby, turned on, and set to Bluetooth mode",[{text:"Try Again",onPress:()=>{BleManager.scan([],10,false);setScanStatus("Scanning for Device");}},{text:"OK",onPress:()=>{console.log("We Stopped The Scan");setScanStatus("");
+        setIsUpdating(false);
+        console.log("Is Updating Is "+isUpdating);
+        setIsScanning(false);
+        console.log("Is Scanning Is "+isScanning);
+        setScanButtonColor("white");
+        setScanButtonOpacity(1.0);}}]);
+      }
+      
+    }
+      
     
     //console.log("Scan Stopped "+args.status);
 
   });
+
+  
+    try
+    {
+      if(lastUsageAddress == null)
+        AsyncStorage.getItem("lastAddress").then((value)=>{lastUsageAddress = value;console.log("Value Is This Yes"+lastUsageAddress);}).catch((error)=>{console.log("Retrieve error");})
+
+      //console.log("French Fries "+lastDataAddress);
+      
+    }
+    catch(error)
+    {
+      console.log("Error Retrieving Last Address");
+    }
+  
   /*
   if(currentUserData.serialNumber != "")
   {
@@ -1602,46 +2002,85 @@ const MainScreen = ({route,navigation}) => {
     setScanButtonOpacity(1.0);
   }*/
     
-  
-  async function initBackgroundFetch()
+  console.log("Current User Is "+route.params.from);
+  console.log(auth().currentUser);
+  if(route.params.from == "login" && !auth().currentUser.emailVerified && !verifyShown)
   {
+    Alert.alert("E-mail Not Verified","Please check your e-mail to verify your account",[{text:'Resend E-mail',onPress:()=>{auth().currentUser.sendEmailVerification().then(()=>{
+
+      Alert.alert("Notice","E-mail verification sent",[{text:"OK"}])
+
+    }).catch((error)=>{
+
+      Alert.alert("Notice","There was an error sending the verification e-mail "+error);
+
+    });}},{text:"OK"}]);
+    setVerifyShown(true);
+  }
+    
+
+  
+  
     const onEvent = async(taskID) =>{
       
+      showNotifiction("Notice","Background Download Started");
+      console.log("Hello George!!");
+      BleManager.scan([],4200,false);
+      showNotifiction("Scan Started");
+      /*
       var rightNow = new Date();
       if(rightNow.getHours() > 0 && rightNow.getHours() < 4)
 
       {
-        isBackgroundScan = true;
+        //isBackgroundScan = true;
         bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{if(args.status == 10)showNotifiction("Error","We could not detect your registered device");return;})
 
-        BleManager.scan([],4200,false);
+        
       }
       
       
-      
+      */
       //BackgroundFetch.finish(taskID);
       
   
     }
   
     const onTimeout = async (taskID) => {
+      showNotifiction("Notice","Function Timeout");
       console.warn('[BackgroundFetch] TIMEOUT task: ', taskID);
       BackgroundFetch.finish(taskID);
     }
   
-    let status = await BackgroundFetch.configure({minimumFetchInterval: 15}, onEvent, onTimeout);
-    showNotifiction("Notice","Background Download Ready. Will fire between 12:00-4:00 am");
-    backgroundInitiated = true;
+    if(backgroundInitiated == false)
+    { 
+      setBackgroundInitiated(true);
+      setIsBackground(true);
+      BackgroundFetch.configure({minimumFetchInterval: 15}, onEvent, onTimeout).then((result)=>{
+        showNotifiction("Notice","Background Download Ready. yaay "+result);
+        
+      }).catch((error)=>{
+        setBackgroundInitiated(false);
+        showNotifiction("Notice","There was an error setting up the Background Download "+error);
+      });
+
+    }
       
-  }
-  if(!backgroundInitiated)
-    initBackgroundFetch();
+    
+    //backgroundInitiated = true;
+      
+  
+  
+  //initBackgroundFetch();
+    
+  
+    
 
   //updateMarkedDates(route.params.calendarInfo);
   var tempPreset;
-  function newGetDeviceData(peripheral,address)
+  /*function getDeviceData(peripheral,address)
   {
 
+    //return new Promise((resolve,reject)=>{});
 
     console.log("Address is "+address+" ");
     BleManager.connect(peripheral.id).then(()=>{
@@ -1663,13 +2102,19 @@ const MainScreen = ({route,navigation}) => {
                       /*if(complianceTime/60 < 1)
                         complianceHours = 0;
                       else
-                        complianceHours = 1;*/
+                        complianceHours = 1;
                       let comTime = `${complianceHours} hrs ${complianceTime%60} min`;
                       configArray = [comTime,languages[readData[12]],readData[14],Boolean(readData[15]),Boolean(readData[16])];
-                      lastUsageAddress = (256*readData[5]+readData[4])-16;
-                      if(lastUsageAddress > 4070)
+                      console.log("The Stuff Is ");
+                      console.log((256*readData[5]+readData[4])-16);
+                      setLastUsageAddress((256*readData[5]+readData[4])-16);
+                      console.log("Last Usage Address Is "+lastUsageAddress);
+                      if(lastUsageAddress > 4070 || (lastDataAddress != null && lastDataAddress == lastUsageAddress))
                       {
-                        Alert.alert("Notice","No New Records. Device was recently reset.",[{text:'OK',onPress:()=>{
+                        
+                        const noticeString = lastUsageAddress > 4070 ? "No New Records. Device was recently reset.":"No New Records";
+                        
+                        Alert.alert("Notice",noticeString,[{text:'OK',onPress:()=>{
                           
                           setScanStatus("");
                           setIsUpdating(false);
@@ -1687,17 +2132,19 @@ const MainScreen = ({route,navigation}) => {
                       console.log("Config Array "+configArray);
                       console.log("Last Usage Data "+lastUsageAddress+" "+[readData[5],readData[4]]);
                       //Start Reading Preset Data
+                      
                       if(readData[4] == 0)
                       {
                         //AsyncStorage.setItem("lastAddress",[readData[5]-1,0]);
-                        newGetDeviceData(peripheral,[readData[5]-1,0]);
+                        getDeviceData(peripheral,[readData[5]-1,0]);
                       }
                       else
                       {
                         //AsyncStorage.setItem("lastAddress",[readData[5]-1,0]);
-                        newGetDeviceData(peripheral,[readData[5],readData[4]-16]);
-                        //newGetDeviceData(peripheral,[readData[5],readData[4]]);
+                        getDeviceData(peripheral,[readData[5],readData[4]-16]);
+                        //getDeviceData(peripheral,[readData[5],readData[4]]);
                       }
+                      return;
                         
                   }
                   
@@ -1743,24 +2190,24 @@ const MainScreen = ({route,navigation}) => {
                         
                       
                       if(address[1] == 0)
-                        newGetDeviceData(peripheral,[address[0]-1,240]);
+                        getDeviceData(peripheral,[address[0]-1,240]);
                       else
-                        newGetDeviceData(peripheral,[address[0],address[1]-16]);
+                        getDeviceData(peripheral,[address[0],address[1]-16]);
                   }
                   else if(256*address[0]+address[1]>896)
                   {
                     console.log("Read Data Is "+readData);
                     console.log("LAst Time "+userDeviceInfo.lastdatatime);
                     var newRecords = false;
-                    if(userDeviceInfo == "null" || !userDeviceInfo.hasOwnProperty('lastdatatime') || userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
+                    if(userDeviceInfo == "null" || !userDeviceInfo.hasOwnProperty('lastdatatime') || (lastDataAddress != null && 256*address[0]+address[1] >= lastDataAddress) ||userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5]))
                     {
                       if(readData[0] == 93)
                       {
                         usageCount++;
                         newRecords = true;
-                        //console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                        console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
                         usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
-                        //console.log("Array So Far "+usageArray);
+                        console.log("Array So Far "+usageArray);
                       }
                       if(readData[0] == 173)
                       {
@@ -1776,13 +2223,23 @@ const MainScreen = ({route,navigation}) => {
                       
                      
                     }
+                    else
+                    {
+                      console.log("Go To Preset Data");
+                      getDeviceData(peripheral,[3,80])
+                      return;
+                    }
+
+                    
+
+
                     if(address[1] == 0)
                     {
-                        newGetDeviceData(peripheral,[address[0]-1,240]);
+                        getDeviceData(peripheral,[address[0]-1,240]);
                     }
                     else
                     {
-                        newGetDeviceData(peripheral,[address[0],address[1]-16]);
+                        getDeviceData(peripheral,[address[0],address[1]-16]);
                     }
                   }
                   else{
@@ -1862,7 +2319,7 @@ const MainScreen = ({route,navigation}) => {
                              token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc0NTAxNzk4LCJleHAiOjE2NzczODE3OTh9.69wZGgeSBXvaPmxXu7URgXhYu_-ZfZjUis1oxu32EYg
                                action=insertData
                                dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0,0,0,0,0,0,0],["A",["Oct. 12 2022","06:20 PM"],0,0,0,0,0,0]],"Preset":[[0,0,0,0,0,0,0,0,0]],"Config":[2,2,2,2,2],"UserInfo":{"PatientName":"Russell Jowell","PatientEmail":"russ.jowell@gmail.com","DoctorEmail":"russdoctor@medical.com","DeviceName":"Avid IF2"}}
-                           */
+                           
                              
                              
                              
@@ -1948,23 +2405,420 @@ const MainScreen = ({route,navigation}) => {
 
   });//End Connect
 //});
+ }*/
+
+
+
+ //////////
+
+ async function getDeviceData(peripheral,address)
+ {
+    setScanStatus("Reading Device Data"); 
+    return new Promise((resolve,reject)=>{
+ 
+         BleManager.connect(peripheral.id).then(()=>{
+             BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+                 BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{
+                     setTimeout(()=>{
+                         BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+                             if(address[0] == 0 && address[1]==0)
+                             {
+                                 let complianceTime = parseInt(changeNumBase(readData[3])+changeNumBase(readData[2])+changeNumBase(readData[1])+changeNumBase(readData[0]),16);
+                                 var complianceHours = complianceTime/60 < 1?0:1;
+                                 /*
+                                 if(complianceTime/60 < 1)
+                                     complianceHours = 0;
+                                  else
+                                     complianceHours = 1;
+                                 */
+                                 let comTime = `${complianceHours} hrs ${complianceTime%60} min`;
+                                 configArray = [comTime,languages[readData[12]],readData[14],Boolean(readData[15]),Boolean(readData[16])];
+                                 console.log("The Stuff Is "+readData[5]+" "+readData[4]);
+                                 console.log((256*readData[5]+readData[4])-16);
+                                 let lastAddressVal = (256*readData[5]+readData[4])-16;
+                                 //setLastUsageAddress(lastAddressVal);
+                                 console.log("Last Usage Address Isss "+lastAddressVal+" "+lastUsageAddress);
+
+
+
+                                
+
+                                  //console.log("Value Is hello "+value);
+                                  if(lastAddressVal > 4070 || (lastUsageAddress != null && lastUsageAddress == lastAddressVal.toString()))
+                                  {
+                                      console.log("It was rejected");
+                                      const noticeString = lastUsageAddress > "4070" ? "No New Records. Device was recently reset.":"No New Records";
+                                      return reject(noticeString);
+                                     
+                                  }
+
+                                  console.log("Config Array "+configArray);
+                                  console.log("Last Usage Data "+lastUsageAddress+" "+[readData[5],readData[4]]);
+                                 //Start Reading Preset Data
+                       
+                                  return resolve([0,readData[5],readData[4]]);
+
+
+                             
+
+
+
+                                
+                                 
+                         
+                             }
+                             else if(256*address[0]+address[1] <= 896 && 256*address[0]+address[1] >= 256)
+                             {
+                                 //console.log("Preset Is "+readData)
+                                 console.log("Next Preset Address "+[address[0],address[1]+16]);
+                                  if((256*address[0]+address[1])%32 == 0 && 256*address[0]+address[1] != 896)
+                                  {
+                                     console.log("Preset Is This: "+readData);
+                                     var presetArray = [];
+                                     if(readData[1]>128)
+                                         presetArray.push("Yes");
+                                     else
+                                         presetArray.push("No");
+ 
+                                     presetArray.push("On");
+                                     presetArray.push("N");
+                                     if(readData[9]%2==0)
+                                         presetArray.push("2");
+                                     else
+                                         presetArray.push("4");
+ 
+                                     if(readData[9] >= 192)
+                                         presetArray.push("6/6");
+                                     else if(readData[9] >= 128)
+                                         presetArray.push("6|6");
+                                     else if(readData[9] >= 64)
+                                         presetArray.push("1|1")
+                                     else
+                                         presetArray.push("Continuous");
+ 
+                                     presetArray.push(readData[18]);
+                                     presetArray.push(readData[10]);
+                                     presetArray.push(readData[12]);
+                                     presetArray.push(readData[13]);
+ 
+                                     console.log(presetArray);
+                                     masterPresetArray.unshift(presetArray);
+ 
+                                  }
+                                 return resolve([1,999,999]); 
+                             }
+                             else if(256*address[0]+address[1]>896)
+                             {
+                                 console.log("Read Data Is "+readData);
+                                 console.log("LAst Time "+userDeviceInfo.lastdatatime);
+                                 var newRecords = false;
+                                 if(userDeviceInfo == "null" || !userDeviceInfo.hasOwnProperty('lastdatatime') || ((lastUsageAddress != null && (256*address[0]+address[1]).toString() >= lastUsageAddress) && userDeviceInfo.lastdatatime < convertDateStringForCompare(readData[1],readData[2],readData[3],readData[4],readData[5])))
+                                 {
+                                     if(readData[0] == 93)
+                                     {
+                                         usageCount++;
+                                         console.log("Birds "+usageCount);
+                                         //setUsageCount(uCount);
+                                         newRecords = true;
+                                         console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                                         usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                                         console.log("Array So Far "+usageArray);
+                                     }
+                                     if(readData[0] == 173)
+                                     {
+                                        questionCount++;
+                                        console.log("Bees "+questionCount);
+                                        //setQuestionCount(qCount);
+                                         newRecords = true;
+                                         console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
+                                         usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
+                                         console.log("Arrayy Soo Fffar "+usageArray);
+                                     }
+                                     console.log("Usage "+usageCount+" Question "+questionCount);
+                                 }
+                                 else
+                                 {
+                                     console.log("Go To Preset Data");
+                                     AsyncStorage.setItem("lastAddress",(256*address[0]+address[1]).toString());
+                                     return resolve([2,999,999]);
+                                 }
+                                 return resolve([3,999,999]);
+                                 /*
+                                 if(address[1] == 0)
+                                 {
+                                     getDeviceData(peripheral,[address[0]-1,240]);
+                                 }
+                                 else
+                                 {
+                                     getDeviceData(peripheral,[address[0],address[1]-16]);
+                                 }
+                                 */
+                             }
+                             else
+                             {                           
+                                
+                                console.log("Uploading Data To Server!");
+                                console.log("Here we do "+lastUsageAddress);
+                                
+                                //return;
+                                var jsonData = "{";
+                                jsonData += '"SerialNumber":"'+currentUserData.serialnumber+'","UserInfo":{"PatientName":"'+currentUserData.name+'","PatientEmail":"'+currentUserData.email+'","DoctorEmail":"'+currentUserData.doctorEmail+'","DeviceName":"Avid IF2"},';
+                                jsonData += '"Usage":[';
+                                for(var i = 0; i < usageArray.length;i++)
+                                {
+                                  if(usageArray[i][0] == "U")
+                                  {
+                                    console.log("Date Is "+usageArray[i][1][0]);
+                                    jsonData += '["'+usageArray[i][0]+'",["'+usageArray[i][1][0]+'","'+usageArray[i][1][1]+'"],'+usageArray[i][2]+','+usageArray[i][4]+','+usageArray[i][3]+','+usageArray[i][5]+','+usageArray[i][6]+','+usageArray[i][7]+','+usageArray[i][8]+','+usageArray[i][9]+']';
+                                  }
+                                  else
+                                  {
+                                    jsonData += '["'+usageArray[i][0]+'",["'+usageArray[i][1][0]+'","'+usageArray[i][1][1]+'"],';
+                               
+                                    for(var j = 2;j<8;j++)
+                                    {
+                                      if(isNaN(usageArray[i][j]))
+                                        jsonData += '"'+usageArray[i][j]+'"';
+                                      else
+                                        jsonData += usageArray[i][j];
+                                      if(j != 7)
+                                        jsonData+= ",";
+                                      else
+                                        jsonData+= "]";
+                                    }
+                                  }
+                                  if(i != usageArray.length - 1)
+                                    jsonData += ",";
+                           
+                                }
+                                jsonData += '],';
+                                jsonData+= '"Config":["'+configArray[0]+'","'+configArray[1]+'","'+configArray[2]+'","'+configArray[3]+'","'+configArray[4]+'"]';
+                                jsonData += ',"Preset":[';
+                                for(var i = 0;i<masterPresetArray.length;i++)
+                                {
+                                  jsonData += '["'+masterPresetArray[i][0]+'","'+masterPresetArray[i][1]+'","'+masterPresetArray[i][2]+'","'+masterPresetArray[i][3]+'","'+masterPresetArray[i][4]+'","'+masterPresetArray[i][5]+'","'+masterPresetArray[i][6]+'","'+masterPresetArray[i][7]+'","'+masterPresetArray[i][8]+'"]';
+                                  if(i != masterPresetArray.length - 1)
+                                    jsonData += ",";
+                                }
+                                jsonData+=']';
+                                jsonData += "}";
+                                //console.log(jsonData);
+                           
+                           
+                             /*
+                             token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VyTmFtZSI6InJ1c3NlbGxfam93ZWxsIiwiaGFzaCI6Ijk5NDVhOGM3MzQwYzNlZWY1YmZjNmIwYzQ5NTQ5YmIzIiwiUGVybWlzc2lvbiI6NSwiaWF0IjoxNjc0NTAxNzk4LCJleHAiOjE2NzczODE3OTh9.69wZGgeSBXvaPmxXu7URgXhYu_-ZfZjUis1oxu32EYg
+                               action=insertData
+                               dataJson={"SerialNumber":"F001451","Usage":[["U",["Oct. 12 2022","06:15 PM"],0,0,0,0,0,0,0,0],["A",["Oct. 12 2022","06:20 PM"],0,0,0,0,0,0]],"Preset":[[0,0,0,0,0,0,0,0,0]],"Config":[2,2,2,2,2],"UserInfo":{"PatientName":"Russell Jowell","PatientEmail":"russ.jowell@gmail.com","DoctorEmail":"russdoctor@medical.com","DeviceName":"Avid IF2"}}
+                           */
+                             
+                             const dataRequestOptions = {
+                             
+                               method:'POST',
+                               headers: {'x-access-token':currentUserData.token},
+                               body: 'action=insertData&dataJson='+jsonData+'&appversion='+appVersion
+                               //        data:'action=signIn'+'&whereJson='+JSON.stringify({'username':username,'password':password})+'&appversion='+global.appVersion
+                           
+                           
+                             };
+                             
+                             console.log(dataRequestOptions.body);
+                             console.log("Cheese Puffs are GREAT!!");
+                             //fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseJson)=>{
+                              fetch('https://avid.vqconnect.io/nodejs/deviceList',dataRequestOptions).then((response)=>response.json()).then((responseFromJson)=>  { 
+                              
+                              console.log("Yessssir");
+                              AsyncStorage.getItem("lastAddress").then((value)=>{
+                                console.log("The last value was this: "+value);
+                              });
+                              //AsyncStorage.setItem("lastAddress",lastUsageAddress.toString());  
+                              return resolve([4,questionCount,usageCount]);
+                              /*  
+                              console.log("Error Is "+responseFromJson.code+"  "+responseFromJson.msg);
+                                BleManager.disconnect(peripheral.id);
+                              if(isBackgroundScan)
+                                showNotifiction("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
+                              else
+                                {
+
+                                }
+                              //console.log("Upload Complete. Get it!!");
+                              //console.log("Step One ");
+                              setCurrentMonth([new Date().getMonth(),new Date().getFullYear()]);
+                              //console.log("Step Two A");
+                              updateCalendar([new Date().getMonth(),new Date().getFullYear()]);
+                              //console.log("Step Three");
+                              fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
+                                  if(responseJson.code == 207)
+                                  {
+                                      userDeviceInfo = "null";
+                                  }      
+                                  else
+                                    setLastUploadTime(responseJson.data.lastdatatime);
+                        //updateMarkedDates(responseJson);  
+                              });//End FEtch
+                    
+                              setIsUpdating(false);
+                              setUploadStatus(uploadStatus+"\nUpload Complete!");
+                      Alert.alert("Notice","Upload Complete",[{text:'OK',onPress:()=>{
+                          
+                          setScanStatus("");
+                          setIsUpdating(false);
+                          setIsScanning(false);
+                          setScanButtonColor("white");
+                          setScanButtonOpacity(1.0);
+                        
+                        
+                        }}
+                    
+                    
+                      ]);
+                    console.log("Upload Complete. Hooray!");
+                  
+                      */
+                  }).catch((error)=>{console.log("Upload Error "+error);
+                
+                  return reject("Upload Error. Sorry");
+                });
+                            return;
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                             }
+ 
+                         }).catch((error)=>{showNotifiction("Read Error",error)});
+                     },500);
+                 }).catch((error)=>{showNotifiction("Write Error",error)});
+ 
+             }).catch((error)=>{showNotifiction("Retrieve Service Error",error)});
+         }).catch((error)=>{showNotifiction("Connect Error",error)});
+ 
+     }).then((returnVal)=>{
+         switch(returnVal[0])
+         {
+          //Initial Read
+          case 0:
+            if(returnVal[2] == 0)
+              return getDeviceData(peripheral,[returnVal[1]-1,0]);
+            else
+              return getDeviceData(peripheral,[returnVal[1],returnVal[2]-16]);
+          case 1:
+            if(address[1] == 0)
+              return getDeviceData(peripheral,[address[0]-1,240]);
+            else
+              return getDeviceData(peripheral,[address[0],address[1]-16]);
+            //break;
+          case 2:
+            return getDeviceData(peripheral,[3,80]);
+          case 3:
+            //setUsageCount(returnVal[1]);
+            //setQuestionCount(returnVal[2]);
+            if(address[1] == 0)
+                return getDeviceData(peripheral,[address[0]-1,240]);
+            else
+                return getDeviceData(peripheral,[address[0],address[1]-16]);
+          case 4:
+
+          /*
+
+          var nowTime = new Date();
+          console.log(nowTime.getYear()-100+" "+(Number(nowTime.getMonth())+1)+" "+nowTime.getDate()+" "+nowTime.getHours()+" "+nowTime.getMinutes()+" "+nowTime.getSeconds());
+
+          */
+          
+          var nowTime= new Date();  
+          let dateMessage = [128,Number(nowTime.getYear()-100),Number((nowTime.getMonth())+1),Number(nowTime.getDate()),Number(nowTime.getHours()),Number(nowTime.getMinutes()),Number(nowTime.getSeconds())];
+
+            BleManager.connect(peripheral.id).then(()=>{
+
+              BleManager.retrieveServices(peripheral.id,["F0001110-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+
+                BleManager.write(peripheral.id,"F0001111-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",dateMessage).then(()=>{
+                  console.log("Write New Time Success");
+
+                });
+
+              });
+
+
+            });
+
+            return(["Success",returnVal[1],returnVal[2]]);
+         }
+     }).catch((error)=>{
+        if(error == "Upload Error. Sorry")
+          return(["Fail","There was an upoload error!"]);
+        return(["Fail",error]);
+     });//End Main Promise
  }
+
+ /////////
+
+
+
+
+  function updateConnectTime(peripheral)
+  {
+
+  }
   
   function handleDiscoverDevice(peripheral){
 
-    //console.log("Device Is "+peripheral.advertising.localName.substring(0,11));
+    //console.log("Device Is "+currentUserData.serialNumber);
+    
+    if(peripheral.name != null && peripheral.advertising.localName != null && peripheral.advertising.localName.substring(0,4) == "Avid")
+    {
+      var trueFalse = peripheral.advertising.localName == "Avid "+currentUserData.serialnumber ? "Yes":"No";
+      
+      showNotifiction("Notice","We found device SN "+peripheral.advertising.localName+" Is this your device? "+trueFalse);
+    }
+    
     if(peripheral.name != null && peripheral.advertising.localName == "Avid "+currentUserData.serialnumber)
     {
       BleManager.stopScan();
 
-        console.log("Reading Data from Device - Please Wait");
-        newGetDeviceData(peripheral,[0,0]);
+        console.log("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
+        //showNotifiction("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
+        setScanStatus("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
+        getDeviceData(peripheral,[0,0]).then((result)=>{
+
+          
+        setScanStatus("");
+        setIsUpdating(false);
+        console.log("Is Updating Is "+isUpdating);
+        setIsScanning(false);
+        console.log("Is Scanning Is "+isScanning);
+        setScanButtonColor("white");
+        setScanButtonOpacity(1.0);
+          if(isBackground)
+          {
+            if(result[0] == "Success")
+              showNotifiction("Notice","We uploaded records "+result[1]+" "+result[2]);
+            else
+              showNotifiction("Notice",result[1]);
+          }
+          else
+          {
+            if(result[0] == "Success")
+              Alert.alert("Notice","Success");
+            else 
+              Alert.alert("Notice","Fail "+result[1]);
+          }
+          console.log("Things were a succes! ");
+          console.log(result);
+
+        });
         
        
 
 
      
     }
+    
 
   }
 
@@ -1984,7 +2838,7 @@ const MainScreen = ({route,navigation}) => {
     });
   }
 
-  const startDeviceScanButton = () => {
+  const startDeviceScanButton = (isBackground) => {
 
     
     
@@ -1995,7 +2849,7 @@ const MainScreen = ({route,navigation}) => {
     setScanButtonOpacity(0.3);
     setScanStatus("Scanning for Device");
     
-    BleManager.scan([],20,false);
+    BleManager.scan([],13,false);
 
   
 
@@ -2016,7 +2870,7 @@ return(
 <Calendar markedDates={markedDates}  onDayPress={day=>{console.log("The Day Is "+day.dateString);if(day.dateString in markedDates){navigation.navigate("USAGE SUBSTACK",{currentDate:day.dateString,from:"calendar"});}  }} onMonthChange={month => {console.log(month);setCurrentMonth([month.month,month.year]);updateCalendar([month.month,month.year]);setDatesUpdated(false);}} markingType={'multi-dot'}></Calendar>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:28,marginTop:'8%'}]}>Your Current Device:</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23}]}>{currentDeviceString}</Text>
-<TouchableOpacity disabled={isScanning} alignSelf='center' onPress={()=>{Alert.alert("Prepare To Connect","Please ensure your paired AVID device is turned on and Bluetooth mode is activated",[{text:"OK",onPress:()=>{isBackgroundScan=false;startDeviceScanButton();}}]);}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
+<TouchableOpacity disabled={isScanning} alignSelf='center' onPress={()=>{Alert.alert("Prepare To Connect","Please ensure your paired AVID device is turned on and Bluetooth mode is activated",[{text:"OK",onPress:()=>{setIsBackground(false);startDeviceScanButton();}}]);}} style={{opacity:scanButtonOpacity, alignSelf:'center', marginTop:30,marginBottom:5, backgroundColor: "#722053", width:"80%" }}><Text style={{ fontFamily: "Proxima Nova",fontWeight:'bold',color:scanButtonColor, textAlign: 'center', fontSize: 25, margin:10, }}>Sync Device Data</Text></TouchableOpacity>
 <Text style={{fontSize:17,color:'grey',alignSelf:'center'}}>{scanStatus}</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:23,marginTop:'8%'}]}>Last Upload Time:</Text>
 <Text style={[styles.grayButton,{alignSelf:'center',fontSize:18}]}>{moment(lastUploadTime,'YYYY-MM-DD').format('MMM DD, YYYY')}</Text>

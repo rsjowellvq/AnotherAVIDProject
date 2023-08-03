@@ -51,6 +51,7 @@
 		89C6BE57DB24E9ADA2F236DE /* Pods-AVID-AVIDTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AVID-AVIDTests.release.xcconfig"; path = "Target Support Files/Pods-AVID-AVIDTests/Pods-AVID-AVIDTests.release.xcconfig"; sourceTree = "<group>"; };
 		8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info-1.plist"; path = "../../../Downloads/GoogleService-Info-1.plist"; sourceTree = "<group>"; };
 		8A403A7B29CA1B82001BB1B3 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		8ADB05BD2A7B502A000C3250 /* AVID.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = AVID.entitlements; path = AVID/AVID.entitlements; sourceTree = "<group>"; };
 		9DB39466C8D3407C80A38C4F /* Proxima-Nova-Semibold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Proxima-Nova-Semibold.otf"; path = "../assets/fonts/Proxima-Nova-Semibold.otf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -95,6 +96,7 @@
 		13B07FAE1A68108700A75B9A /* AVID */ = {
 			isa = PBXGroup;
 			children = (
+				8ADB05BD2A7B502A000C3250 /* AVID.entitlements */,
 				8A403A7B29CA1B82001BB1B3 /* GoogleService-Info.plist */,
 				8A0E81D22967856900FBAC48 /* GoogleService-Info-1.plist */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
@@ -473,6 +475,8 @@
 			baseConfigurationReference = 5B7EB9410499542E8C5724F5 /* Pods-AVID-AVIDTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				DEVELOPMENT_TEAM = TEZ6BV2KL3;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
@@ -500,7 +504,9 @@
 			baseConfigurationReference = 89C6BE57DB24E9ADA2F236DE /* Pods-AVID-AVIDTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = TEZ6BV2KL3;
 				INFOPLIST_FILE = AVIDTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -525,6 +531,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AVID/AVID.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TEZ6BV2KL3;
 				ENABLE_BITCODE = NO;
@@ -559,6 +566,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AVID/AVID.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TEZ6BV2KL3;
 				INFOPLIST_FILE = AVID/Info.plist;

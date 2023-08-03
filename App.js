@@ -8,18 +8,20 @@ import BleManager, { read, setName,checkState } from 'react-native-ble-manager';
 import React, { useCallback,useEffect,useRef } from 'react';
 import { Table, TableWrapper, Row, Rows, Col, Cols, Cell } from 'react-native-table-component';
 import auth from '@react-native-firebase/auth';
-import moment from 'moment';
+import moment, { now } from 'moment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
+import messaging from '@react-native-firebase/messaging';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 import BackgroundFetch from "react-native-background-fetch";
 import BackgroundTimer from 'react-native-background-timer';
-import notifee from '@notifee/react-native';
+import notifee, {EventType} from '@notifee/react-native';
 //import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import {Buffer} from 'buffer';
 import {
   Alert,
   ActivityIndicator,
+  AppRegistry,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -41,9 +43,9 @@ import {
   requireNativeComponent,
   TouchableHighlight,
 } from 'react-native';
-import { acc, add } from 'react-native-reanimated';
-import { emit } from 'process';
-import { stat } from 'fs';
+//import App from './App';
+//import {name as appName} from './app.json';
+
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -257,6 +259,7 @@ function calculation(add_0,add_1)
 
   function convertDateStringForCompare(year,month,day,hour,minute)
   {
+    //2023-05-12 05:35
     var returnString = "";
     returnString += "20"+year+"-";
     if(month < 10)
@@ -287,10 +290,27 @@ function calculation(add_0,add_1)
 var usageCount = 0;
 var questionCount = 0;
 var lastUsageAddress;
+
+async function requestUserPermission() {
+  console.log("Did we get permission??");
+  const authStatus = await messaging().requestPermission();
+  const enabled =
+    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+  if (enabled) {
+    console.log('Authorization status:', authStatus);
+  }
+}
   
 
+notifee.onBackgroundEvent(async ({type,detail})=>{
+    const {notification,pressAction} = detail;
+    if(type==EventType.ACTION_PRESS)
+      await notifee.cancelNotification(notification.id);
+});
 
-  function showNotifiction(titleInput,bodyInput)
+  function showNotification(titleInput,bodyInput)
   {
     notifee.requestPermission().then(()=>{
 
@@ -317,18 +337,18 @@ var lastUsageAddress;
 
         console.log("Pigs In A Blanket");
         getDeviceData(peripheral,[0,0]).then(()=>{
-          showNotifiction("Upload Complete!","We uploaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" records to your account!");
+          showNotification("Upload Complete!","We uploaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" records to your account!");
           const now = new Date();
           AsyncStorage.setItem("Last Upload Time",now.toString());
         }).catch((error)=>{
-          showNotifiction("Upload Error","There was a problem with your upload. We'll try again later!");
+          showNotification("Upload Error","There was a problem with your upload. We'll try again later!");
         });
         
         
         
 
       });
-      //showNotifiction("Success","We Found Device "+peripheral.name);
+      //showNotification("Success","We Found Device "+peripheral.name);
 
 
       //getDeviceData(peripheral,[0,0]);
@@ -341,8 +361,9 @@ var lastUsageAddress;
     }
   }
 
+  
 
-
+ 
 
  
   
@@ -357,12 +378,49 @@ function processForegrouondApp()
 }
 */
 
+
  const App = () => {
 
+  requestUserPermission();
+  
+  messaging().getToken().then((token)=>{
+    console.log("The token is "+token);
+  });
+
+  
+
+ function onMsgReceived(message)
+  {
+    showNotification("Notice","Message "+message);
+    const bleManagerEmitterA = new NativeEventEmitter(NativeModules.BleManager);
+    function messageProcess()
+    {
+      console.log("Process")
+    }
+    //console.log(bleManagerEmitter);
+    //bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleSelectFoundDevice);
+    bleManagerEmitterA.addListener('BleManagerDiscoverPeripheral',messageProcess);
+    BleManager.scan([],5,false);
+    
+  }
+
+  
+
+
+
+  messaging().getInitialNotification().then(remoteMessage=>{
+    if(remoteMessage)
+      showNotification("Notice","The Info is "+remoteMessage);
+  });
   
   
+
   //Start Bluetooth Manager
-    React.useEffect(()=>{BleManager.start();});
+    React.useEffect(()=>{
+      BleManager.start();
+      //messaging().  onBackgroundMessage(async remoteMsg => {showNotification("Hello","The notice is "+remoteMsg);});
+    
+    });
     
     console.log("Hello");
 
@@ -416,12 +474,17 @@ function searchForDevices(){
 BackgroundTimer.runBackgroundTimer(searchForDevices,5000);
 */
 
+BackgroundTimer.runBackgroundTimer(()=>{showNotification("Notice","BG Event");console.log("BG event!");BackgroundTimer.stop();},20000);
 
 React.useEffect(()=>{
-  showNotifiction("Hello","We're Here");
+  //showNotification("Hello","We're Here");
   return ()=>{
     console.log("It was closed");
-    showNotifiction("Notice","AVID App was closed. BG download cancelled");
+    
+      showNotification("Notice","AVID App was closed. BG download cancelled");
+   
+
+   
   }
 
 },[]);
@@ -431,15 +494,21 @@ React.useEffect(()=>{
 
 
 
-    console.log("boobs");
-
-
-    const MainStack = ({route,navigation}) => (
+    console.log("boobs "+auth().currentUser);
 
     
+    const MainStack = ({route,navigation}) => 
+    {
+      console.log("Info is "+route.params);
+      var calendarData = route.params?route.params.calendarInfo:null;
+      var serialNumberInput = route.params?route.params.serialNumber:null;
+      var fromInput = route.params?route.params.from:null;
+      return(
+
+      
         <Drawer.Navigator initialRouteName='HOME' screenOptions={{drawerActiveTintColor:'white',drawerInactiveTintColor:'white',  drawerStyle:{drawerActiveTintColor:'yellow',  backgroundColor: avidPurpleHex}}}>
         
-        <Drawer.Screen name="HOME" component={MainScreen} initialParams={{calendarInfo:route.params.calendarInfo,serialNumber:route.params.serialNumber,from:route.params.from}}/>
+        <Drawer.Screen name="HOME" component={MainScreen} initialParams={{calendarInfo:calendarData,serialNumber:serialNumberInput,from:fromInput}}/>
         <Drawer.Screen name="USAGE SUBSTACK" component={UsageHistoryStack} options={{drawerItemStyle:{display:"none"},unmountOnBlur:true,headerShown:false}}/>
         
        {/*} <Drawer.Screen name="LOGOUT" component={LoginScreen} options={{headerShown:false}} initialParams={{from:"logout",nextScreen:"HOME"}}/>*/}
@@ -449,18 +518,26 @@ React.useEffect(()=>{
       </Drawer.Navigator>
     
        );
+    }
+    
+    
+    
+   
 
       const LogoutStack = ({route,navigation}) => {
 
-        
+        showNotification("Notice","Logout Started");
         navigation.dispatch(
-
+          
           CommonActions.reset({
             index:0,
             routes:[{name:"Login"}]
           })
+          
     
         );
+
+        showNotification("Notice","Navigation Done");
         //nextLoginScreen = "HOME";
         console.log("Logout PRocess");
         const logoutRequestOptions = {
@@ -472,26 +549,42 @@ React.useEffect(()=>{
     
     
         };
+        showNotification("Notice","Logout Options "+JSON.stringify(logoutRequestOptions));
         console.log("step 1");
         fetch("https://avid.vqconnect.io/nodejs/login",logoutRequestOptions).then((response)=>response.json())
         .then((responseJson)=>{
           currentUserData = null;
           console.log("step 122");
+          showNotification("Notice","Step 122");
+          AsyncStorage.removeItem("currentUserData");
+          AsyncStorage.removeItem("isConnected");
+          AsyncStorage.removeItem("lastDeviceAddress");
+          BackgroundTimer.stopBackgroundTimer();
+
           BleManager.getConnectedPeripherals([]).then((peripheralArray)=>{
+            showNotification("Notice","Connect Peripherals"+peripheralArray);
             if(peripheralArray.length != 0)
+            {
+              showNotification("Notice","Disconnected");
               BleManager.disconnect();
-          }).catch(error=>{console.log(error)});
-          console.log("step 33");
-          //route.params=null;
-          if(auth().currentUser)
-            auth().signOut();
-          console.log("Step 444 ");
+              showNotification("Notice","Disconnect Done");
+            }
+            console.log("step 33");
+            showNotification("Notice","step 33");
+            //route.params=null;
+            if(auth().currentUser)
+              auth().signOut();
+            console.log("Step 444 ");
+            showNotification("Notice","Step 44");
+              
+          }).catch(error=>{showNotification("Notice","BT Disconnect Error "+error);console.log(error);});
+         
           //setNextNavScreen("HOME");
           //route.params.nextScreen = "HOME";
           
           
           
-        }).catch((error)=>{console.log(error)});
+        }).catch((error)=>{showNotification("Notice","Logout Network Error "+error);console.log(error)});
         
         //return(<DrawerItem label="LoGoUt" onPress={()=>{console.log("Button Was Pressed!!")}} />);
 
@@ -518,23 +611,97 @@ React.useEffect(()=>{
         </Stack.Navigator>);
       
        };
-      
-    console.log("burgers");
-      return(
-          <NavigationContainer>
-        <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
-          <Stack.Screen name="Forgot Username" component={ForgotUsernameScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
-          <Stack.Screen name="Forgot Password" component={ForgotPasswordScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
-          <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
-          <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
-          <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
-        </Stack.Navigator>
-        </NavigationContainer>
-      )
+       
+        console.log("burgers");
+       console.log("Is there a current user? "+auth().currentUser);
+
+
+       
+       
+       AsyncStorage.getItem("initialLoginCheck").then((result)=>{
+
+        if(!result && auth().currentUser)
+        {
+          auth().signOut().then(()=>{
+            AsyncStorage.setItem("initialLoginCheck","1").then(()=>{return;});
+          });
+        }
+        return;
+       });
+
+        
+        var nextScreen = auth().currentUser?"Main":"Login";
+        console.log("NExt Screen Is "+nextScreen);
+        if(auth().currentUser)
+        {
+          
+          AsyncStorage.getItem("currentUserData").then((userData)=>{
+
+            currentUserData = userData;
+            console.log("Data Successful!");
+           
+            //return;
+            
+            console.log("cheddar cheese");
+          }).then(()=>{
+
+            AsyncStorage.getItem("userDeviceInfo").then((deviceInfo)=>{
+
+              userDeviceInfo = deviceInfo;
+              console.log("user successful!");
+              //return;
+
+            }).then(()=>{return;});
+          
+            console.log("Poopy Box");
+          });
+          
+         
+          
+          return(
+            <NavigationContainer>
+          <Stack.Navigator initialRouteName={nextScreen}>
+            <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
+            <Stack.Screen name="Forgot Username" component={ForgotUsernameScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+            <Stack.Screen name="Forgot Password" component={ForgotPasswordScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+            <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+            <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
+            <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+          </Stack.Navigator>
+          </NavigationContainer>
+        )
+          
+          
+          
+          
+
+        }
+        else{
+        console.log(nextScreen);
+          return(
+              <NavigationContainer>
+            <Stack.Navigator initialRouteName={nextScreen}>
+              <Stack.Screen name="Login" component={LoginScreen} options={{unmountOnBlur:true,headerShown:false}}/>
+              <Stack.Screen name="Forgot Username" component={ForgotUsernameScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+              <Stack.Screen name="Forgot Password" component={ForgotPasswordScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+              <Stack.Screen name="Sign Up" component={SignupScreen} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',backgroundColor:'white'}}/>
+              <Stack.Screen name="Main" component={MainStack} options={{headerShown:false}}/>
+              <Stack.Screen name="Select Device" component={DeviceSelection} options={{headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white'}}/>
+            </Stack.Navigator>
+            </NavigationContainer>
+          )}
+
+
+
+       
+
+       
+     
 
 }
 
+
+//AppRegistry.registerComponent(appName,()=>App);
 
 const DayUsageScreen = ({route,navigation}) => {
 
@@ -986,11 +1153,22 @@ const LoginScreen = ({route,navigation}) => {
     const [loginStatus,setLoginStatus] = React.useState("");
     const [eyeIcon,setEyeIcon] = React.useState(require(eyeCloseIcon));
     const [secureTextOn,setSecureTextOn] = React.useState(true);
+    const [usernameSet,setUsernameSet] = React.useState(false);
     const [isLoading,setIsLoading] = React.useState(false);
     const [userInfo,setUserInfo] = React.useState();
     const [loginProcessStaus,setLoginProcessStatus] = React.useState("");
     const [nextNavScreen,setNextNavScreen] = React.useState("");
   console.log("aches ");
+
+  AsyncStorage.getItem("username").then((username)=>{
+      if(username && !usernameSet)
+      {
+        setUsername(username);
+        setUsernameSet(true);
+        console.log("Hello67 "+username);
+      }
+        
+  });
 
   if(route.params != null)
     console.log(route.params.from);
@@ -1062,7 +1240,8 @@ const LoginScreen = ({route,navigation}) => {
         .then((responseJson)=>{
           
           userDeviceInfo = responseJson.data.status == 2 ? responseJson.data:"null";
-      
+          console.log("The User Device Info Is "+userDeviceInfo.lastdatatime+" "+userDeviceInfo.lastuserdata.Address);
+          
           if(userDeviceInfo == "null" || userDeviceInfo.lastuserdata == null)
           {
             console.log("No Device Connected");
@@ -1072,7 +1251,20 @@ const LoginScreen = ({route,navigation}) => {
           else
           {
             console.log("Device SN "+currentUserData.serialnumber);
-              
+            AsyncStorage.setItem("lastUploadAddress",userDeviceInfo.lastuserdata.Address.toString());
+            AsyncStorage.setItem("lastUploadDate",userDeviceInfo.lastdatatime.toString());
+            AsyncStorage.setItem("userDeviceInfo",JSON.stringify(userDeviceInfo));
+
+            AsyncStorage.getItem("lastUploadAddress").then((item)=>{
+              if(item)
+                console.log("The last upload address was "+item);
+            });
+
+            AsyncStorage.getItem("lastUploadDate").then((item)=>{
+              if(item)
+                console.log("The last upload date was  "+item);
+
+            });
           getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
                               
@@ -1086,8 +1278,8 @@ const LoginScreen = ({route,navigation}) => {
           }).catch((error)=>{
             console.log("There Was Problem "+error);
             auth().signOut().then(()=>{
-
-              Alert.alert("Network Error","Please Try Again");
+              AsyncStorage.removeItem("currentUserData").then(()=>{Alert.alert("Network Error","Please Try Again");});
+              
 
             })
 
@@ -1133,13 +1325,21 @@ const LoginScreen = ({route,navigation}) => {
         switch(responseJson.code)
         {
           case 200:
-            currentUserData = responseJson.data;  
+            currentUserData = responseJson.data;
+            console.log("Egg Rolls and Rice");
+            AsyncStorage.setItem("currentUserData",JSON.stringify(responseJson.data));
+            AsyncStorage.getItem("currentUserData").then((theData)=>{console.log("The Data Is "+theData)}).catch((error)=>{console.log("There was a problem "+error);});
+            AsyncStorage.setItem("username",usernameIn);  
             if(!auth().currentUser)
               auth().createUserWithEmailAndPassword(responseJson.data.email.toLowerCase(),passwordIn).then((userCredential)=>{
                 userAccountPtr.doc(usernameIn.toLowerCase()).set({eMail:responseJson.data.email.toLowerCase(),md5pass:responseJson.data.PassHash});
                 auth().currentUser.sendEmailVerification().then(()=>{console.log("E-mail success");retrieveData();})
                 //return;
-              }).catch((error)=>{console.log("Erris is "+error)});
+              }).catch((error)=>{console.log("Erris is "+error);
+            
+              auth().signInWithEmailAndPassword(responseJson.data.email.toLowerCase(),passwordIn).then(()=>{retrieveData();})
+            
+            });
             else
               retrieveData();
             break;
@@ -1724,6 +1924,7 @@ const DeviceSelection = ({route,navigation}) => {
   */
   function createNewUser(deviceID)
   {
+    BleManager.stopScan();
     setIsRegistering(true);
     route.params.newUserInfo.serialNumber = deviceID;
     console.log("User Info Is "+JSON.stringify(route.params.newUserInfo));
@@ -1771,6 +1972,12 @@ const DeviceSelection = ({route,navigation}) => {
         console.log("step 111");
         fetch('https://avid.vqconnect.io/nodejs/login',loginRequestOptions).then((response)=>response.json()).then((responseJson)=>{
           console.log("Point G");
+          AsyncStorage.setItem("currentUserData",JSON.stringify(responseJson.data));
+          auth().createUserWithEmailAndPassword(responseJson.data.email.toLowerCase(),route.params.newUserInfo.password).then((userCredential)=>{
+            userAccountPtr.doc(route.params.newUserInfo.username).set({eMail:responseJson.data.email.toLowerCase(),md5pass:responseJson.data.PassHash});
+            auth().currentUser.sendEmailVerification().then(()=>{console.log("E-mail success");return;});
+            //return;
+          }).then(()=>{
         currentUserData = responseJson.data;  
         getMonthUsageData(new Date().getMonth()+1,new Date().getFullYear()).then((result)=>{
 
@@ -1778,7 +1985,7 @@ const DeviceSelection = ({route,navigation}) => {
           //setIsLoading(false);
           fetch("https://avid.vqconnect.io/nodejs/deviceList?action=findUsageData&SerialNumber="+currentUserData.serialnumber+"&token="+currentUserData.token).then((response)=>response.json()).then((responseJson)=>{
             console.log("Point H");
-
+            AsyncStorage.setItem("userDeviceInfo",JSON.stringify(userDeviceInfo));
           userDeviceInfo = responseJson.data;  
           setIsRegistering(false);
           //auth().sendEmailVerification();
@@ -1788,7 +1995,7 @@ const DeviceSelection = ({route,navigation}) => {
           });
           
 
-        });
+        });}).catch((error)=>{console.log("Erris is "+error)});
 
 
         });
@@ -1828,7 +2035,7 @@ const DeviceSelection = ({route,navigation}) => {
     else if(name.includes("-"))
       Alert.alert("Device Error","This device has not been configured yet. Please contact customer support");
     else
-      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[{text:'Yes',onPress:()=>{createNewUser(name);}},{text:'No'}]);
+      Alert.alert("Confirm Device","Are you sure you want to register Device "+name+"?",[{text:'Yes',onPress:()=>{createNewUser(name.substring(0,7));}},{text:'No'}]);
 
   }
     if(peripheral.name != null && peripheral.name.substring(0,4) == "Avid" && !foundDevices.includes(peripheral.advertising.localName.substring(5)))
@@ -1843,7 +2050,7 @@ const DeviceSelection = ({route,navigation}) => {
         if(response == "DEVICE_DOES_NOT_EXIST")
           char = "-";
          
-        setDeviceList(deviceList => [...deviceList,<Pressable style={{marginTop:'3%',marginBottom:'3%',alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:'white',borderColor:avidPurpleHex}} deviceId={peripheral.advertising.localName.substring(5)} onPress={e=>onChanged(e,peripheral.advertising.localName.substring(5))} ><Text style={{padding:'4%',fontFamily: "Verdana-Bold",color: avidPurpleHex, textAlign: 'center', fontSize: 15}}>{peripheral.advertising.localName.substring(5)+" "+char}</Text></Pressable>])
+        setDeviceList(deviceList => [...deviceList,<Pressable style={{marginTop:'3%',marginBottom:'3%',alignSelf:'center',width:'80%',borderWidth:2,backgroundColor:'white',borderColor:avidPurpleHex}} deviceId={peripheral.advertising.localName.substring(5)} onPress={e=>onChanged(e,peripheral.advertising.localName.substring(5)+" "+char)} ><Text style={{padding:'4%',fontFamily: "Verdana-Bold",color: avidPurpleHex, textAlign: 'center', fontSize: 15}}>{peripheral.advertising.localName.substring(5)+" "+char}</Text></Pressable>])
         setFoundDevices(foundDevices =>[...foundDevices,peripheral.advertising.localName.substring(5)]);
 
       });
@@ -1907,52 +2114,221 @@ const DeviceSelection = ({route,navigation}) => {
 
 
 const MainScreen = ({route,navigation}) => {
-
-  console.log(currentUserData);
-  const currentSerialNumber = currentUserData.serialnumber == ''?"No Device Paired":currentUserData.serialnumber;
+  //AsyncStorage.setItem("lastUploadAddress","2336");
+  //AsyncStorage.removeItem("lastDeviceAddress");
+  AsyncStorage.removeItem("isConnected");
+  AsyncStorage.removeItem("lastDeviceAddress");
+  console.log(JSON.stringify(currentUserData));
+  console.log("mcdonalds1234");
+  //if(currentUserData == null)
+  //  currentUserData = AsyncStorage.getItem("currentUserData");
+  //const currentSerialNumber = currentUserData.serialnumber == ''?"No Device Paired":currentUserData.serialnumber;
   console.log("Last Upload Was "+userDeviceInfo);
   const [uploadStatus,setUploadStatus] = React.useState("");
   const initialMarkedDates = {}
   const [datesUpdated,setDatesUpdated] = React.useState(false);
-  const [currentDeviceString,setCurrentDeviceString] = React.useState(currentUserData.serialnumber == ''?"No Device Paired":currentUserData.serialnumber);
+  const [currentDeviceString,setCurrentDeviceString] = React.useState('');
   //const [currentSerialNumber,updateSerialNumber] = React.useState(route.props.serialNumber);
   const [markedDates,updateMarkedDates] = React.useState(route.params.calendarInfo);
   const [currentMonth,setCurrentMonth] = React.useState([new Date().getMonth()+1,new Date().getFullYear()]);
   const [isUpdating,setIsUpdating] = React.useState(false);
   const [verifyShown,setVerifyShown] = React.useState(false);
-  const [lastDataAddress,setLastDataAddress] = React.useState(null);
+  const [lastUploadedAddress,setLastUploadedAddress] = React.useState(0);
   const [backgroundInitiated,setBackgroundInitiated] = React.useState(false);
   const [isBackground,setIsBackground] = React.useState(true);
   //const [lastUsageAddress,setLastUsageAddress] = React.useState(0);
   //const [usageCount,setUsageCount] = React.useState(0);
   //const [questionCount,setQuestionCount] = React.useState(0);
-  const [scanButtonColor,setScanButtonColor] = React.useState(currentUserData.serialnumber == ''?"#bbb":"#fff");
-  const [scanButtonOpacity,setScanButtonOpacity] = React.useState(currentUserData.serialnumber == ''?0.3:1.0);
+  const [scanButtonColor,setScanButtonColor] = React.useState('');
+  const [scanButtonOpacity,setScanButtonOpacity] = React.useState(1.0);
   const [foundDevice,setFoundDevice] = React.useState(false);
-  const [isScanning,setIsScanning] = React.useState(currentUserData.serialnumber == '');
+  const [isScanning,setIsScanning] = React.useState(false);
   const [scanStatus,setScanStatus] = React.useState("");
-  const [lastUploadTime,setLastUploadTime] = React.useState(userDeviceInfo.lastdatatime);
-  navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+currentUserData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
+  /*var currentUserDeviceInfo;
+  if(!userDeviceInfo)
+  {
+    currentUserDeviceInfo = AsyncStorage.getItem("userDeviceInfo");
+  }
+  else
+  {
+    currentUserDeviceInfo = userDeviceInfo;
+  }*/
+
+  bleManagerEmitter.addListener('BleManagerStopScan',()=>{showNotification("Notice","Stop Background");BackgroundTimer.stop();})
+  bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',(peripheral)=>{
+    AsyncStorage.getItem("isBackground").then((item)=>{
+      if(item == "0")
+      {
+        //Not Background
+        handleDiscoverDevice;
+      }
+      else
+      {
+        AsyncStorage.getItem("currentUserData").then((theUserData)=>JSON.parse(theUserData)).then((userInfo)=>{
+          if(peripheral.name != null && peripheral.advertising.localName != null && peripheral.advertising.localName.substring(0,12) == "Avid "+userInfo.serialnumber)
+          {
+            showNotification("We Found Your Device ",peripheral.advertising.localName);
+            BackgroundTimer.stop();
+          }
+        });
+      }
+    });
+
+  });
+  const [lastUploadTime,setLastUploadTime] = React.useState('');
+  
   const Circle = (color,size) => {return <View style={{alignSelf:'center',width:size,height:size,borderRadius:size/2,backgroundColor:color}}></View>};
 
+AsyncStorage.getItem("currentUserData").then((userDataIn)=>JSON.parse(userDataIn)).then((userData)=>{
+  //console.log("The NAme Is "+userData.uid);
+  setCurrentDeviceString(userData.serialnumber == ''?"No Device Paired":userData.serialnumber);
+  setScanButtonColor(userData.serialnumber == ''?"#bbb":"#fff");
+  setScanButtonOpacity(userData.serialnumber == ''?0.3:1.0);
+  navigation.setOptions({headerStyle:{backgroundColor:avidPurpleHex},headerTintColor:'white',headerTitle:"Welcome, "+userData.name,headerRight:()=>(<ActivityIndicator alignSelf='center' color="white" animating={isUpdating}/>)});
+  setIsScanning(userData.serialNumber=='');
+  return;
 
+});
+
+var isConnected = false;
+var count = 0;
+/*BackgroundTimer.runBackgroundTimer(()=>{
+  //showNotification("Notice","Scan Started");
+AsyncStorage.setItem("isBackground","1");
+function newGetDeviceData(peripheral,address,isBackground)
+{
+    return new Promise((resolve,reject)=>{
+        BleManager.connect(peripheral.id).then(()=>{
+            BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+                BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{
+                    setTimeout(()=>{
+                        BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+                            if(256*address[0]+address[1]==0)
+                            {
+                                let complianceTime = parseInt(changeNumBase(readData[3])+changeNumBase(readData[2])+changeNumBase(readData[1])+changeNumBase(readData[0]),16);
+                                var complianceHours = complianceTime/60 < 1?0:1;
+                                let comTime = `${complianceHours} hrs ${complianceTime%60} min`;
+                                configArray = [comTime,languages[readData[12]],readData[14],Boolean(readData[15]),Boolean(readData[16])];
+                                BleManager.disconnect(peripheral.id);
+                                return resolve([0,(256*readData[5]+readData[4])-16]);
+                                
+                                //let lastAddressVal = (256*readData[5]+readData[4])-16;
+                                //var currentDate = new Date();
+                                //AsyncStorage.setItem("lastUploadTime",convertDateStringForCompare(currentDate.getYear().toString().substring(2)))
+                            }
+                            if(256*address[0]+address[1]>896)
+                            {
+                                AsyncStorage.getItem("lastUploadAddress").then((item)=>{
+                                    if(item && item < (256*address[0]+address[1]).toString())
+                                    {
+                                        var currentItem;
+                                        if(readData[0] == 93)
+                                            currentItem = ["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]];
+                                        if(readData[0] == 173)
+                                            currentItem = ["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]];
+                                        return resolve ([1,256*address[0]+address[1]+16,currentItem]);
+                                       
+                                        
+                                    }
+                                    else
+                                    {
+                                        //get preset data
+                                    }
+                                })
+                            }
+
+                        }).catch((error)=>{showNotification("Notice","Read Error "+error)})
+                    },310)
+
+                }).catch((error)=>{showNotification("Notice","Write Error "+error)})
+
+            }).catch((error)=>{showNotification("Notice","Retrieve Service Error "+error);})
+
+        }).catch((error)=>{showNotification("Notice","Connect Error "+error)})
+    }).then((returnVal)=>{
+        switch(returnVal[0])
+        {
+            case 0:
+                if(isBackground)
+                {
+                    AsyncStorage.setItem("lastDeviceAddress",returnVal[1]).then(()=>{console.log("The device address is "+returnVal[1]);return;});
+                }
+                else
+                {
+                    AsyncStorage.getItem("lastUsageAddress").then((result)=>{
+                        if(result)
+                        {
+                            let resultVal = parseInt(result)+16;
+                            return newGetDeviceData(peripheral,[Math.floor(resultVal/256),resultVal%256],false);
+                        }
+                    });
+                }
+            case 1:
+                if(isBackground)
+                {
+                    AsyncStorage.getItem("recordOne").then((record)=>{
+                        if(record)
+                            AsyncStorage.setItem("recordTwo",JSON.stringify(returnVal[2])).then(()=>{console.log("Record Two "+JSON.stringify(returnVal[2]));return;});
+                        else
+                            AsyncStorage.setItem("recordOne",JSON.stringify(returnVal[2])).then(()=>{console.log("Record One "+JSON.stringify(returnVal[2]));return;});
+                    });
+                    
+                }
+                else
+                {
+                    usageArray.push(returnVal[2]);
+                    //let addressVal = 256*address[0]+address[1];
+                    return newGetDeviceData(peripheral,[Math.floor(returnVal[1]/256),returnVal[1]%256],false);
+
+                }
+                    
+        }
+    });
+}
+
+BleManager.scan([],3,false).then(()=>{console.log("We started the scan!")});
+  
+  
+  AsyncStorage.getItem("isConnected").then((item)=>{
+  
+  
+  if(!item)
+  {
+    
+  
+  
+    
+
+}});},20000);*/
+
+AsyncStorage.getItem("userDeviceInfo").then((deviceJSON)=>JSON.parse(deviceJSON)).then((deviceInfo)=>{
+
+    //console.log(deviceInfo.lastdatatime);
+    //console.log(deviceInfo);
+    setLastUploadTime(deviceInfo.lastdatatime);
+    //console.log("Last Time Was "+lastUploadTime);
+    setLastUploadedAddress(deviceInfo.lastuserdata.Address);
+    //console.log("The Last Addresss was "+lastDataAddress);
+    return;
+
+}).catch((error)=>{console.log("What was the error "+error)});
  
 
 
-
+  /*
   bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
   bleManagerEmitter.removeAllListeners('BleManagerStopScan');
   bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',handleDiscoverDevice);
   bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{
 
     setScanStatus("");
-    showNotifiction("Notice","Background Scan Halted.");
+    showNotification("Notice","Background Scan Halted.");
     console.log("The Args "+args);
     if(args.status==10)
     {
       if(isBackground)
       {
-        showNotifiction("Error","We could not detect your device!");
+        showNotification("Error","We could not detect your device!. Will try again later");
       }
       else
       {
@@ -1970,7 +2346,7 @@ const MainScreen = ({route,navigation}) => {
     
     //console.log("Scan Stopped "+args.status);
 
-  });
+  });*/
 
   
     try
@@ -2017,36 +2393,211 @@ const MainScreen = ({route,navigation}) => {
     });}},{text:"OK"}]);
     setVerifyShown(true);
   }
-    
 
+
+ function updateDeviceTime(peripheral)
+ {
+            console.log("Eggplants");
+            var nowTime= new Date();
+            console.log("Eggplants1");  
+            let dateMessage = [128,Number(nowTime.getYear()-100),Number((nowTime.getMonth())+1),Number(nowTime.getDate()),Number(nowTime.getHours()),Number(nowTime.getMinutes()),Number(nowTime.getSeconds())];
+
+            BleManager.connect(peripheral.id).then(()=>{
+
+              BleManager.retrieveServices(peripheral.id,["F0001110-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+
+                BleManager.write(peripheral.id,"F0001110-0451-4000-B000-000000000000","F0001111-0451-4000-B000-000000000000",dateMessage).then(()=>{
+                  console.log("Write New Time Success");
+                  setLastUploadTime(""+(currentDate.getYear()+1900)+"-"+(currentDate.getMonth()+1+"-"+(currentDate.getDate())));
+                  console.log("Big Mac With Cheese");
+                  AsyncStorage.removeItem("isConnected");
+                  BleManager.disconnect(peripheral.id);
+                  console.log("Successfully Wrote Time ");
+                  showNotification("Successfully Wrote Time ");
+                  isConnected = false;
+
+                }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 1 ",error)});
+
+              }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 2",error)});
+
+
+            }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 3",error)});
+ }
+    
+  
   
   
     const onEvent = async(taskID) =>{
       
-      showNotifiction("Notice","Background Download Started");
+      showNotification("Notice","Background Download Started");
       console.log("Hello George!!");
-      BleManager.scan([],4200,false);
-      showNotifiction("Scan Started");
+      bleManagerEmitter.removeAllListeners('BleManagerDiscoverPeripheral');
+      bleManagerEmitter.removeAllListeners('BleManagerStopScan');
+      bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{if(args.status == 10)showNotification("Error","We could not detect your registered device");BackgroundFetch.finish(taskID);return;});
+      bleManagerEmitter.addListener('BleManagerDiscoverPeripheral',(peripheral)=>{
+
+        
+        AsyncStorage.getItem("currentUserData").then((theUserData)=>JSON.parse(theUserData)).then((userInfo)=>{
+        
+        if(peripheral.name != null && peripheral.advertising.localName != null && peripheral.advertising.localName.substring(0,12) == "Avid "+userInfo.serialnumber)
+        {
+          var startTime = new Date();
+          BleManager.stopScan();
+          showNotification("Notice","So Far So Good");
+          console.log("Time Start "+startTime);
+          AsyncStorage.getItem("lastDeviceAddress").then((item)=>{
+
+            if(!item)
+            {
+              BleManager.connect(peripheral.id).then(()=>{
+                showNotification("Notice","Device Connected");
+                BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+                  showNotification("Notice","Service Retrieved");
+                  BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",[0,0]).then(()=>{
+                    showNotification("Notice","Write");
+                    setTimeout(()=>{
+                      BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+                        showNotification("Notice","The Address is "+(256*readData[5]+readData[4]-16).toString());
+                        console.log("The Address Is "+(256*readData[5]+readData[4]-16).toString());
+                        
+                       
+                        
+                        AsyncStorage.setItem("lastDeviceAddress",(256*readData[5]+readData[4]-16).toString()).then(()=>{
+                          BackgroundFetch.finish(taskID);
+                          var endTime = new Date();
+                          console.log("End Time "+endTime);
+                        });
+                        
+                      })
+                    },300);
+                      // let lastAddressVal = (256*readData[5]+readData[4])-16;
+                  })
+                }).catch((error)=>{showNotification("Notice","Retrieve Error a "+error);});
+              }).catch((error)=>{showNotification("Notice","Connect Error a "+error);});
+            }
+            else
+            {
+              AsyncStorage.getItem("lastUploadAddress").then((lastUploadAddress)=>{
+                if(item != lastUploadAddress)
+                {
+                  console.log("Last Upoload Address 1 "+lastUploadAddress)
+                  lastUploadAddress = parseInt(lastUploadAddress)+16;
+                  console.log("Last Upload Address 2 "+lastUploadAddress);
+                  item = parseInt(item);
+                  console.log("The Addresses Are "+item+" "+lastUploadAddress+" "+Math.floor(lastUploadAddress/256)+" "+lastUploadAddress%256);
+                  getBackgroundData(peripheral,[Math.floor(lastUploadAddress/256),lastUploadAddress%256],[Math.floor(item/256),item%256],false,[],[],[]);
+                }
+                
+                BackgroundFetch.finish(taskID);
+              })
+            }
+
+
+          })
+          
+          
+          
+          /*
+          BleManager.stopScan();
+          BleManager.connect(peripheral.id).then(()=>{
+            showNotification("Notice","Connected");
+            BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+              showNotification("Notice","Retrieved");
+              BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",[3,144]).then(()=>{
+                showNotification("Notice","Write Success");
+                setTimeout(()=>{
+                  BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+                    showNotification("Notice","Read "+readData);
+                    AsyncStorage.setItem("lastBackgroundRecord",JSON.stringify(readData)).then(()=>{BackgroundFetch.finish(taskID);});
+                    console.log("The Data Is "+readData);
+                    
+                    if(readData[0] == 93)
+                    {
+                      usageCount++;
+                      console.log("Birds "+usageCount);
+                      //setUsageCount(uCount);
+                      newRecords = true;
+                      console.log("Usage "+["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                      usageArray.push(["U",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),readData[6]-128, calculation(readData[8],readData[9]),calculation(readData[10],readData[11]),readData[12],readData[13],readData[14],readData[15],256*address[0]+address[1]]);
+                      console.log("Array So Far "+usageArray);
+                    }
+                    if(readData[0] == 173)
+                    {
+                      questionCount++;
+                      console.log("Bees "+questionCount);
+                      //setQuestionCount(qCount);
+                      newRecords = true;
+                      console.log("Answer "+["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);  
+                      usageArray.push(["A",generateDateTimeString(readData[1],readData[2],readData[3],readData[4],readData[5]),answers[readData[6]],answers[readData[7]],answers[readData[8]],answers[readData[9]],answers[readData[10]],256*address[0]+address[1]]);
+                      console.log("Arrayy Soo Fffar "+usageArray);
+                    }
+                    
+                  }).catch((error)=>{showNotification("Read Error ",error)});
+                },300);
+
+              }).catch((error)=>{showNotification("Write Error ",error)});
+
+            }).catch((error)=>{showNotification("Retrieve Error ",error)});
+          }).catch((error)=>{showNotification("Connection Error ",error)})*/
+          
+
+
+          /*
+
+          BleManager.connect(peripheral.id).then(()=>{
+             BleManager.retrieveServices(peripheral.id,["F0001130-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+                 BleManager.write(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",address).then(()=>{
+                     setTimeout(()=>{
+                         BleManager.read(peripheral.id,"F0001130-0451-4000-B000-000000000000","F0001132-0451-4000-B000-000000000000").then((readData)=>{
+
+          */
+        }}).catch((error)=>{console.log("Fetch Error "+error)});
+
+      });
+      BleManager.scan([],3,false);
+      
+      /*
+      AsyncStorage.getItem("lastBackgroundRecord").then((item)=>{
+
+        if(item)
+        {
+          showNotification("Notice","Placeholder for uploading data");
+          AsyncStorage.removeItem("lastBackgroundRecord").then(()=>{
+            BackgroundFetch.finish(taskID);
+          })
+        }
+        else
+        {
+          
+          BleManager.scan([],4200,false);
+          showNotification("Scan Started-A");
+        }
+
+      });*/
+
+
+
+      
       /*
       var rightNow = new Date();
       if(rightNow.getHours() > 0 && rightNow.getHours() < 4)
 
       {
         //isBackgroundScan = true;
-        bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{if(args.status == 10)showNotifiction("Error","We could not detect your registered device");return;})
+        bleManagerEmitter.addListener('BleManagerStopScan',(args)=>{if(args.status == 10)showNotification("Error","We could not detect your registered device");return;})
 
         
       }
       
       
       */
-      //BackgroundFetch.finish(taskID);
+      BackgroundFetch.finish(taskID);
       
   
     }
   
     const onTimeout = async (taskID) => {
-      showNotifiction("Notice","Function Timeout");
+      showNotification("Notice","Function Timeout");
       console.warn('[BackgroundFetch] TIMEOUT task: ', taskID);
       BackgroundFetch.finish(taskID);
     }
@@ -2055,13 +2606,13 @@ const MainScreen = ({route,navigation}) => {
     { 
       setBackgroundInitiated(true);
       setIsBackground(true);
-      BackgroundFetch.configure({minimumFetchInterval: 15}, onEvent, onTimeout).then((result)=>{
-        showNotifiction("Notice","Background Download Ready. yaay "+result);
+      /*BackgroundFetch.configure({minimumFetchInterval:30}, onEvent, onTimeout).then((result)=>{
+        showNotification("Notice","Background Download Ready. yaay "+result);
         
       }).catch((error)=>{
         setBackgroundInitiated(false);
-        showNotifiction("Notice","There was an error setting up the Background Download "+error);
-      });
+        showNotification("Notice","There was an error setting up the Background Download "+error);
+      });*/
 
     }
       
@@ -2343,7 +2894,7 @@ const MainScreen = ({route,navigation}) => {
                                 console.log("Error Is "+responseFromJson.code+"  "+responseFromJson.msg);
                                 BleManager.disconnect(peripheral.id);
                               if(isBackgroundScan)
-                                showNotifiction("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
+                                showNotification("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
                               else
                                 {
 
@@ -2436,8 +2987,14 @@ const MainScreen = ({route,navigation}) => {
                                  console.log("The Stuff Is "+readData[5]+" "+readData[4]);
                                  console.log((256*readData[5]+readData[4])-16);
                                  let lastAddressVal = (256*readData[5]+readData[4])-16;
+                                
+                                 AsyncStorage.setItem("lastDeviceAddress",(256*address[0]+address[1]).toString());
+                                 var currentDate = new Date();
+                                 AsyncStorage.setItem("lastUploadTime",convertDateStringForCompare(currentDate.getYear().toString().substring(2)))
                                  //setLastUsageAddress(lastAddressVal);
                                  console.log("Last Usage Address Isss "+lastAddressVal+" "+lastUsageAddress);
+
+                                 
 
 
 
@@ -2636,7 +3193,7 @@ const MainScreen = ({route,navigation}) => {
                               console.log("Error Is "+responseFromJson.code+"  "+responseFromJson.msg);
                                 BleManager.disconnect(peripheral.id);
                               if(isBackgroundScan)
-                                showNotifiction("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
+                                showNotification("Success","We downloaded "+usageCount.toString()+" usage records and "+questionCount.toString()+" answer records!");
                               else
                                 {
 
@@ -2690,12 +3247,12 @@ const MainScreen = ({route,navigation}) => {
                           
                              }
  
-                         }).catch((error)=>{showNotifiction("Read Error",error)});
+                         }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Read Error",error)});
                      },500);
-                 }).catch((error)=>{showNotifiction("Write Error",error)});
+                 }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Write Error",error)});
  
-             }).catch((error)=>{showNotifiction("Retrieve Service Error",error)});
-         }).catch((error)=>{showNotifiction("Connect Error",error)});
+             }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Retrieve Service Error",error)});
+         }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Connect Error",error)});
  
      }).then((returnVal)=>{
          switch(returnVal[0])
@@ -2729,27 +3286,57 @@ const MainScreen = ({route,navigation}) => {
           console.log(nowTime.getYear()-100+" "+(Number(nowTime.getMonth())+1)+" "+nowTime.getDate()+" "+nowTime.getHours()+" "+nowTime.getMinutes()+" "+nowTime.getSeconds());
 
           */
-          
-          var nowTime= new Date();  
-          let dateMessage = [128,Number(nowTime.getYear()-100),Number((nowTime.getMonth())+1),Number(nowTime.getDate()),Number(nowTime.getHours()),Number(nowTime.getMinutes()),Number(nowTime.getSeconds())];
+            console.log("The id for this is "+peripheral.id);
+            BleManager.disconnect(peripheral.id);
+            console.log("Eggplants");
+            var nowTime= new Date();
+            console.log("Eggplants1");  
+            let dateMessage = [128,Number(nowTime.getYear()-100),Number((nowTime.getMonth())+1),Number(nowTime.getDate()),Number(nowTime.getHours()),Number(nowTime.getMinutes()),Number(nowTime.getSeconds())];
 
             BleManager.connect(peripheral.id).then(()=>{
 
               BleManager.retrieveServices(peripheral.id,["F0001110-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
 
-                BleManager.write(peripheral.id,"F0001111-0451-4000-B000-000000000000","F0001131-0451-4000-B000-000000000000",dateMessage).then(()=>{
+                BleManager.write(peripheral.id,"F0001110-0451-4000-B000-000000000000","F0001111-0451-4000-B000-000000000000",dateMessage).then(()=>{
                   console.log("Write New Time Success");
+                  setLastUploadTime(""+(currentDate.getYear()+1900)+"-"+(currentDate.getMonth()+1+"-"+(currentDate.getDate())));
+                  console.log("Big Mac With Cheese");
+                  BleManager.disconnect(peripheral.id);
+                  return(["Success",returnVal[1],returnVal[2]]);
 
-                });
+                }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 1 ",error)});
 
-              });
+              }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 2",error)});
 
 
-            });
+            }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 3",error)});
 
-            return(["Success",returnVal[1],returnVal[2]]);
+            
          }
      }).catch((error)=>{
+        //BleManager.disconnect(peripheral.id);
+        console.log("Eggplants23");
+            var nowTime= new Date();
+            console.log("Eggplants231");  
+            let dateMessage = [128,Number(nowTime.getYear()-100),Number((nowTime.getMonth())+1),Number(nowTime.getDate()),Number(nowTime.getHours()),Number(nowTime.getMinutes()),Number(nowTime.getSeconds())];
+
+            BleManager.connect(peripheral.id).then(()=>{
+
+              BleManager.retrieveServices(peripheral.id,["F0001110-0451-4000-B000-000000000000"]).then((peripheralInfo)=>{
+
+                BleManager.write(peripheral.id,"F0001110-0451-4000-B000-000000000000","F0001111-0451-4000-B000-000000000000",dateMessage).then(()=>{
+                  console.log("Write New Time Success");
+                  setLastUploadTime(""+(currentDate.getYear()+1900)+"-"+(currentDate.getMonth()+1+"-"+(currentDate.getDate())));
+                  console.log("Big Mac With Cheese-222");
+                  BleManager.disconnect(peripheral.id);
+
+                }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 1 ",error)});
+
+              }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 2",error)});
+
+
+            }).catch((error)=>{BleManager.disconnect(peripheral.id);showNotification("Error 3",error)});
+            
         if(error == "Upload Error. Sorry")
           return(["Fail","There was an upoload error!"]);
         return(["Fail",error]);
@@ -2774,7 +3361,7 @@ const MainScreen = ({route,navigation}) => {
     {
       var trueFalse = peripheral.advertising.localName == "Avid "+currentUserData.serialnumber ? "Yes":"No";
       
-      showNotifiction("Notice","We found device SN "+peripheral.advertising.localName+" Is this your device? "+trueFalse);
+      showNotification("Notice","We found device SN "+peripheral.advertising.localName+" Is this your device? "+trueFalse);
     }
     
     if(peripheral.name != null && peripheral.advertising.localName == "Avid "+currentUserData.serialnumber)
@@ -2782,11 +3369,11 @@ const MainScreen = ({route,navigation}) => {
       BleManager.stopScan();
 
         console.log("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
-        //showNotifiction("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
+        //showNotification("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
         setScanStatus("Reading Data from Device - Please Wait "+currentUserData.serialnumber);
         getDeviceData(peripheral,[0,0]).then((result)=>{
 
-          
+        BleManager.disconnect(peripheral.id);
         setScanStatus("");
         setIsUpdating(false);
         console.log("Is Updating Is "+isUpdating);
@@ -2797,9 +3384,9 @@ const MainScreen = ({route,navigation}) => {
           if(isBackground)
           {
             if(result[0] == "Success")
-              showNotifiction("Notice","We uploaded records "+result[1]+" "+result[2]);
+              showNotification("Notice","We uploaded records "+result[1]+" "+result[2]);
             else
-              showNotifiction("Notice",result[1]);
+              showNotification("Notice",result[1]);
           }
           else
           {
@@ -2860,7 +3447,7 @@ const MainScreen = ({route,navigation}) => {
 
 return(
 
-<View style={{width:'100%'}}>
+<View style={{width:'100%',height:'100%'}}>
 <View style={{marginTop:'5%',marginHorizontal:'5%',marginBottom:'5%'}}>
 <View style={{flexDirection:'row'}}>{Circle("green",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Usage total time &gt;= 20</Text></View>
 <View style={{flexDirection:'row'}}>{Circle("purple",10)}<Text style={styles.grayButton}>&nbsp;&nbsp;Usage total time &lt; 20</Text></View>

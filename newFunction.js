@@ -115,22 +115,21 @@ function getDeviceData(peripheral,address)
                                 else
                                 {
                                     console.log("Go To Preset Data");
-                                    getDeviceData(peripheral,[3,80])
-                                    return;
+                                    //getDeviceData(peripheral,[3,80])
+                                    return resolve(2);
                                 }
-
-                    
-
-
-                    if(address[1] == 0)
-                    {
-                        getDeviceData(peripheral,[address[0]-1,240]);
-                    }
-                    else
-                    {
-                        getDeviceData(peripheral,[address[0],address[1]-16]);
-                    }
-                  }
+                                return resolve(3);
+                                /*
+                                if(address[1] == 0)
+                                {
+                                    getDeviceData(peripheral,[address[0]-1,240]);
+                                }
+                                else
+                                {
+                                    getDeviceData(peripheral,[address[0],address[1]-16]);
+                                }
+                                */
+                            }
 
                         });
                     },500);
@@ -139,5 +138,9 @@ function getDeviceData(peripheral,address)
             });
         });
 
+    }).then((returnVal)=>{
+        return("The Return Val Is "+returnVal);
+    }).catch((error)=>{
+        return("There was a problem with your stuff "+error);
     });//End Main Promise
 }
